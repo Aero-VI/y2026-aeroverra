@@ -214,7 +214,11 @@ function buildLegend(){
 ---------------------------------------------------------------- */
 const MAPW = 1200, MAPH = 500, LAT_N = 84, LAT_S = -58;
 const R = Math.PI/180;
-const GL = { cx: MAPW/2, cy: MAPH/2, r: 232, lam: -40, phi: 18, mode: 'globe', spin: true, rate: 0.07, z: 1 };
+const GL = { cx: MAPW/2, cy: MAPH/2, r0: 232, r: 232, lam: -40, phi: 18, mode: 'globe', spin: true, rate: 0.07, z: 1 };
+/* the globe frame is a FIXED square in user units. zoom scales the sphere
+   inside it (GL.r = r0 * z) instead of padding the viewBox, so zooming in
+   actually magnifies Japan instead of just trimming 24px of margin. */
+const FRAME = 2*232 + 22;
 
 const pxFlat = (lat,lon) => [ (lon+180)/360*MAPW, (LAT_N-lat)/(LAT_N-LAT_S)*MAPH ];
 
@@ -351,28 +355,26 @@ function drawMap(land, ctys){
 function fitMap(){
   const svg = document.getElementById('map');
   if(!svg) return;
+  const box = svg.parentElement;
+  /* never make the wrapper a flex row: under 720px .maplegend is position:static,
+     so it becomes a sibling flex item and shrinks the sphere to nothing. */
+  if(box){ box.style.display=''; box.style.justifyContent=''; box.style.alignItems=''; box.style.height=''; }
   if(GL.mode==='globe'){
-    /* crop the viewBox right down onto the sphere so the globe is actually big
-       enough to follow the dots. GL.z is the user zoom. */
-    const pad = 26 / GL.z;
-    const half = GL.r + pad, d = half*2;
-    svg.setAttribute('viewBox', `${GL.cx-half} ${GL.cy-half} ${d} ${d}`);
-    /* size by HEIGHT so the square never overflows its box */
+    GL.r = GL.r0 * GL.z;
+    const oc = document.getElementById('ocean');
+    if(oc) oc.setAttribute('r', r1(GL.r));
+    svg.setAttribute('viewBox', `${GL.cx-FRAME/2} ${GL.cy-FRAME/2} ${FRAME} ${FRAME}`);
     const narrow = innerWidth < 760;
-    const h = narrow ? Math.min(innerWidth - 24, innerHeight * .62) : Math.min(innerHeight * .74, 720);
-    svg.style.aspectRatio = '1 / 1';
-    svg.style.width = 'auto';
-    svg.style.height = h + 'px';
+    svg.style.width  = narrow ? '100%' : Math.min(innerHeight*0.74, 720) + 'px';
+    svg.style.height = 'auto';          /* square viewBox => square box */
+    svg.style.aspectRatio = '';
     svg.style.maxWidth = '100%';
     svg.style.margin = '0 auto';
     svg.style.display = 'block';
-    const box = svg.parentElement;
-    if(box){ box.style.height='auto'; box.style.display='flex'; box.style.justifyContent='center'; box.style.alignItems='center'; }
   } else {
     svg.setAttribute('viewBox', `0 0 ${MAPW} ${MAPH}`);
-    svg.style.aspectRatio = ''; svg.style.width='100%'; svg.style.height='auto'; svg.style.maxWidth='';
-    const box = svg.parentElement;
-    if(box){ box.style.height=''; box.style.display=''; }
+    svg.style.aspectRatio=''; svg.style.width='100%'; svg.style.height='auto';
+    svg.style.maxWidth=''; svg.style.margin=''; svg.style.display='block';
   }
 }
 
@@ -415,14 +417,14 @@ function aimAt(lat,lon,ms=1100,z){
   if(GL.mode!=='globe' || REDUCED){ return; }
   if(!AUTOCAM) return;
   let d = ((lon - GL.lam + 540) % 360) - 180;          // shortest way round
-  const z1 = (z==null ? GL.z : Math.max(0.8, Math.min(ZMAX, z)));
+  const z1 = (z==null ? GL.z : Math.max(1, Math.min(ZMAX, z)));
   tween = { l0:GL.lam, p0:GL.phi, z0:GL.z, dz:z1-GL.z,
             dl:d, dp:(Math.max(-62,Math.min(62,lat*0.85)) - GL.phi), t0:performance.now(), ms };
   runTween();
 }
 /* frame something that spans `deg` degrees of arc */
-const ZMAX = 11;
-function zForSpan(deg){ return Math.max(0.85, Math.min(ZMAX, 92/Math.max(6, deg))); }
+const ZMAX = 7;
+function zForSpan(deg){ return Math.max(1, Math.min(ZMAX, 95/Math.max(11, deg))); }
 function angDist(a,b){
   const [la1,lo1]=[a[0]*R,a[1]*R], [la2,lo2]=[b[0]*R,b[1]*R];
   return 2*Math.asin(Math.sqrt(Math.sin((la2-la1)/2)**2 + Math.cos(la1)*Math.cos(la2)*Math.sin((lo2-lo1)/2)**2))/R;
@@ -530,7 +532,7 @@ function mapControls(){
   const move = e => {
     if(!drag) return;
     const t = e.touches?e.touches[0]:e;
-    const k = 0.32 * (MAPW / svg.getBoundingClientRect().width);
+    const k = 0.32 * (FRAME / svg.getBoundingClientRect().width) / GL.z;
     GL.lam = ((drag.lam - (t.clientX-drag.x)*k) + 540)%360 - 180;
     GL.phi = Math.max(-78, Math.min(78, drag.phi + (t.clientY-drag.y)*k));
     tween = null; renderMap();
@@ -542,7 +544,7 @@ function mapControls(){
 }
 
 function zoom(f){
-  GL.z = Math.max(0.75, Math.min(ZMAX, GL.z * f));
+  GL.z = Math.max(1, Math.min(ZMAX, GL.z * f));
   AUTOCAM = false; autoBtn && autoBtn.classList.remove('on');
   fitMap(); renderMap();
 }
