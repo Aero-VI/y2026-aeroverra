@@ -38,8 +38,11 @@ fetch('data/year2026.json?v=14').then(r=>r.json()).then(data=>{
   buildBoard('all'); buildMonths(); buildCards(); buildStreaks(); buildShips();
   $('#genline').textContent = 'Data current to '+pretty(D.today).replace(/^\w+ /,'')+' 2026.';
   wire(); reveal();
-  return fetch('data/land.json?v=14').then(r=>r.json());
-}).then(land => { drawMap(land); syncMap(+$('#scrub').value); });
+  return Promise.all([
+    fetch('data/land.json?v=17').then(r=>r.json()),
+    fetch('data/countries.json?v=17').then(r=>r.json()).catch(()=>null)
+  ]);
+}).then(([land, ctys]) => { drawMap(land, ctys); syncMap(+$('#scrub').value); });
 
 /* ---------------- hero ---------------- */
 function heroStats(){
@@ -211,7 +214,7 @@ function buildLegend(){
 ---------------------------------------------------------------- */
 const MAPW = 1200, MAPH = 500, LAT_N = 84, LAT_S = -58;
 const R = Math.PI/180;
-const GL = { cx: MAPW/2, cy: MAPH/2, r: 232, lam: -40, phi: 18, mode: 'globe', spin: false };
+const GL = { cx: MAPW/2, cy: MAPH/2, r: 232, lam: -40, phi: 18, mode: 'globe', spin: true, rate: 0.07, z: 1 };
 
 const pxFlat = (lat,lon) => [ (lon+180)/360*MAPW, (LAT_N-lat)/(LAT_N-LAT_S)*MAPH ];
 
@@ -245,6 +248,19 @@ function gcMid(a,b){ const g = gc(a,b,2); return g[1] || a; }
 
 /* build a path string from lat/lon points, breaking when they go behind the
    limb (globe) or jump the antimeridian (flat) */
+/* front = facing you, back = the far side of the sphere, drawn as a ghost so a
+   leg happening on the other side of the planet is still visible (Nicholas: "hiding
+   a bunch of activity"). */
+function lineOfSplit(pts){
+  let f='', b='', fpen=false, bpen=false;
+  for(const pt of pts){
+    const [x,y,vis] = proj(pt[0], pt[1]);
+    const X = r1(x), Y = r1(y);
+    if(vis){ f += (fpen?'L':'M')+X+','+Y; fpen=true; bpen=false; }
+    else   { b += (bpen?'L':'M')+X+','+Y; bpen=true; fpen=false; }
+  }
+  return [f,b];
+}
 function lineOf(pts, closed){
   let d='', pen=false, prev=null;
   for(const pt of pts){
@@ -257,8 +273,8 @@ function lineOf(pts, closed){
   return d + (closed && d ? 'Z' : '');
 }
 
-let arcs = [], nodes = {}, mapReady = false, LANDRINGS = [], landPaths = [], gridPaths = [];
-function drawMap(land){
+let arcs = [], nodes = {}, mapReady = false, LANDRINGS = [], landPaths = [], gridPaths = [], CTY = null, ctyPaths = [], hotCCs = [];
+function drawMap(land, ctys){
   const NS = 'http://www.w3.org/2000/svg';
   const svg = document.getElementById('map');
   const gL = $('#gLand'), gA = $('#gArcs'), gN = $('#gNodes');
@@ -281,18 +297,39 @@ function drawMap(land){
     gGrid.appendChild(p);
     gridPaths.push({el:p, pts: Array.from({length:73},(_,i)=>[lat, -180+i*5])});
   }
+  const gBack = document.createElementNS(NS,'g'); gBack.setAttribute('id','gBack');
   svg.insertBefore(gSphere, gL);
+  svg.insertBefore(gBack, gL);
   svg.insertBefore(gGrid, gL);
 
-  LANDRINGS.forEach(()=>{
-    const p = document.createElementNS(NS,'path'); gL.appendChild(p); landPaths.push(p);
-  });
+  if(ctys && ctys.length){
+    /* real country polygons: every country gets an outline so the globe reads as a
+       map, visited ones are filled brighter, and the one he is standing in glows.
+       (Nicholas 2026-11-01: "it's all dark", "highlight the country I go to") */
+    CTY = ctys;
+    ctys.forEach(c=>{
+      const g = document.createElementNS(NS,'g');
+      g.setAttribute('class','cty'+(c.v?' v':''));
+      g.dataset.cc = c.cc;
+      const paths = c.r.map(()=>{ const p=document.createElementNS(NS,'path'); g.appendChild(p); return p; });
+      gL.appendChild(g);
+      ctyPaths.push({g, paths, rings: c.r.map(r=>r.map(pt=>[pt[1],pt[0]])), cc:c.cc, name:c.n});
+    });
+  } else {
+    LANDRINGS.forEach(()=>{
+      const p = document.createElementNS(NS,'path'); gL.appendChild(p); landPaths.push(p);
+    });
+  }
 
+  const gBackRef = document.getElementById('gBack');
   D.moves.forEach(m=>{
     const p = document.createElementNS(NS,'path');
     p.setAttribute('class','arc '+m.t);
     gA.appendChild(p);
-    arcs.push({el:p, m, pts: gc(m.a, m.b, 64)});
+    const pb = document.createElementNS(NS,'path');
+    pb.setAttribute('class','arc back '+m.t);
+    gBackRef.appendChild(pb);
+    arcs.push({el:p, elB:pb, m, pts: gc(m.a, m.b, 64)});
     [[m.a,m.al],[m.b,m.bl]].forEach(([c,lbl])=>{
       const k = c[0].toFixed(2)+','+c[1].toFixed(2);
       if(nodes[k]) return;
@@ -302,8 +339,32 @@ function drawMap(land){
     });
   });
   mapReady = true;
+  fitMap();
   renderMap();
   mapControls();
+  if(GL.spin && !REDUCED) runTween();
+  addEventListener('resize', ()=>{ fitMap(); renderMap(); });
+}
+
+/* On a phone a 1200x500 box renders the globe about 150px across, which is
+   useless. Crop the viewBox to a square around the sphere instead. */
+function fitMap(){
+  const svg = document.getElementById('map');
+  if(!svg) return;
+  if(GL.mode==='globe'){
+    /* crop the viewBox right down onto the sphere so the globe is actually big
+       enough to follow the dots. GL.z is the user zoom. */
+    const pad = 26 / GL.z;
+    const half = GL.r + pad, d = half*2;
+    svg.setAttribute('viewBox', `${GL.cx-half} ${GL.cy-half} ${d} ${d}`);
+    svg.style.aspectRatio = '1 / 1';
+    svg.style.maxHeight = (innerWidth < 760 ? '92vw' : '74vh');
+    svg.style.margin = '0 auto';
+  } else {
+    svg.setAttribute('viewBox', `0 0 ${MAPW} ${MAPH}`);
+    svg.style.aspectRatio = '';
+    svg.style.maxHeight = '';
+  }
 }
 
 function renderMap(){
@@ -311,8 +372,25 @@ function renderMap(){
   document.getElementById('ocean').style.display = globe ? '' : 'none';
   document.getElementById('gGrid').style.display = globe ? '' : 'none';
   gridPaths.forEach(g => g.el.setAttribute('d', lineOf(g.pts,false)));
-  LANDRINGS.forEach((ring,i) => landPaths[i].setAttribute('d', lineOf(ring,true)));
-  arcs.forEach(a => a.el.setAttribute('d', lineOf(a.pts,false)));
+  if(ctyPaths.length){
+    for(const c of ctyPaths){
+      for(let i=0;i<c.rings.length;i++) c.paths[i].setAttribute('d', lineOf(c.rings[i], true));
+    }
+  } else {
+    LANDRINGS.forEach((ring,i) => landPaths[i].setAttribute('d', lineOf(ring,true)));
+  }
+  arcs.forEach(a => {
+    if(globe){
+      const [f,b] = lineOfSplit(a.pts);
+      a.el.setAttribute('d', f);
+      a.elB.setAttribute('d', b);
+      a.elB.style.display = a.el.classList.contains('on') ? '' : 'none';
+    } else {
+      a.el.setAttribute('d', lineOf(a.pts,false));
+      a.elB.setAttribute('d','');
+    }
+  });
+  document.getElementById('gBack').style.display = globe ? '' : 'none';
   for(const k in nodes){
     const n = nodes[k];
     const [x,y,vis] = proj(n.c[0], n.c[1]);
@@ -323,12 +401,22 @@ function renderMap(){
 }
 
 /* --- turn the globe, smoothly --- */
-let spinRAF = 0, tween = null;
-function aimAt(lat,lon,ms=1100){
+let spinRAF = 0, tween = null, AUTOCAM = true, autoBtn = null;
+function aimAt(lat,lon,ms=1100,z){
   if(GL.mode!=='globe' || REDUCED){ return; }
+  if(!AUTOCAM) return;
   let d = ((lon - GL.lam + 540) % 360) - 180;          // shortest way round
-  tween = { l0:GL.lam, p0:GL.phi, dl:d, dp:(Math.max(-55,Math.min(55,lat*0.75)) - GL.phi), t0:performance.now(), ms };
+  const z1 = (z==null ? GL.z : Math.max(0.8, Math.min(ZMAX, z)));
+  tween = { l0:GL.lam, p0:GL.phi, z0:GL.z, dz:z1-GL.z,
+            dl:d, dp:(Math.max(-62,Math.min(62,lat*0.85)) - GL.phi), t0:performance.now(), ms };
   runTween();
+}
+/* frame something that spans `deg` degrees of arc */
+const ZMAX = 11;
+function zForSpan(deg){ return Math.max(0.85, Math.min(ZMAX, 92/Math.max(6, deg))); }
+function angDist(a,b){
+  const [la1,lo1]=[a[0]*R,a[1]*R], [la2,lo2]=[b[0]*R,b[1]*R];
+  return 2*Math.asin(Math.sqrt(Math.sin((la2-la1)/2)**2 + Math.cos(la1)*Math.cos(la2)*Math.sin((lo2-lo1)/2)**2))/R;
 }
 function runTween(){
   cancelAnimationFrame(spinRAF);
@@ -339,13 +427,57 @@ function runTween(){
       const e = f<.5 ? 2*f*f : 1-Math.pow(-2*f+2,2)/2;
       GL.lam = tween.l0 + tween.dl*e;
       GL.phi = tween.p0 + tween.dp*e;
+      if(tween.dz){ GL.z = tween.z0 + tween.dz*e; fitMap(); }
       if(f>=1) tween=null; else busy = true;
     }
-    if(GL.spin && !tween){ GL.lam = (GL.lam + 0.12 + 540)%360 - 180; busy = true; }
+    if(GL.spin && !tween){ GL.lam = (GL.lam + GL.rate + 540)%360 - 180; busy = true; }
     renderMap();
     if(busy) spinRAF = requestAnimationFrame(loop);
   };
   spinRAF = requestAnimationFrame(loop);
+}
+
+
+/* which countries are lit right now */
+function setHot(ccs){
+  const key = ccs.join(',');
+  if(key === hotCCs.join(',')) return;
+  hotCCs = ccs.slice();
+  ctyPaths.forEach(c => c.g.classList.toggle('hot', ccs.includes(c.cc)));
+  /* if nothing is flying, keep the globe pointed at where he actually is */
+  if(!tween && GL.mode==='globe'){
+    const c = ctyPaths.find(x => x.cc === ccs[0]);
+    if(c){
+      let la=0, lo=0, n=0, laMin=90, laMax=-90, loMin=180, loMax=-180;
+      for(const r of c.rings){ for(const pt of r){
+        la+=pt[0]; lo+=pt[1]; n++;
+        laMin=Math.min(laMin,pt[0]); laMax=Math.max(laMax,pt[0]);
+        loMin=Math.min(loMin,pt[1]); loMax=Math.max(loMax,pt[1]);
+      } }
+      /* Japan is 20 degrees tall on a 460px globe, i.e. nothing. Zoom to it. */
+      const span = Math.max(laMax-laMin, (loMax-loMin)*Math.cos(((laMin+laMax)/2)*R));
+      if(n) aimAt(la/n, lo/n, 1500, zForSpan(span*2.1));
+    }
+  }
+}
+
+/* floating label so you can tell where a dot is heading */
+function tagMove(m){
+  if(REDUCED) return;
+  const NS='http://www.w3.org/2000/svg';
+  const g = $('#gLive');
+  const t = document.createElementNS(NS,'text');
+  t.setAttribute('class','movetag');
+  t.textContent = (m.bl || '').split(',')[0];
+  g.appendChild(t);
+  const k = m.b[0].toFixed(2)+','+m.b[1].toFixed(2);
+  const place = () => {
+    const n = nodes[k]; if(!n) return;
+    t.setAttribute('x', n.x + 9); t.setAttribute('y', n.y - 9);
+  };
+  place();
+  const iv = setInterval(place, 60);
+  setTimeout(()=>{ clearInterval(iv); t.remove(); }, 2600);
 }
 
 function mapControls(){
@@ -365,16 +497,27 @@ function mapControls(){
     b.classList.toggle('on', GL.mode==='globe');
     renderMap();
   });
-  mk('SPIN','Idle rotation', false, b=>{
+  mk('SPIN','Idle rotation', true, b=>{
     GL.spin = !GL.spin; b.classList.toggle('on', GL.spin);
     if(GL.spin) runTween();
   });
+  autoBtn = mk('AUTO','Camera follows the action and zooms to the country', true, b=>{
+    AUTOCAM = !AUTOCAM; b.classList.toggle('on', AUTOCAM);
+    if(AUTOCAM){ GL.z = 1; fitMap(); renderMap(); }
+  });
+  mk('＋','Zoom in', false, ()=>zoom(1.35));
+  mk('－','Zoom out', false, ()=>zoom(1/1.35));
   lg.appendChild(box);
+
+  document.getElementById('map').addEventListener('wheel', e=>{
+    if(GL.mode!=='globe') return;
+    e.preventDefault(); zoom(e.deltaY < 0 ? 1.12 : 1/1.12);
+  }, {passive:false});
 
   /* drag to rotate */
   const svg = document.getElementById('map');
   let drag = null;
-  const down = e => { if(GL.mode!=='globe') return; drag = {x:(e.touches?e.touches[0]:e).clientX, y:(e.touches?e.touches[0]:e).clientY, lam:GL.lam, phi:GL.phi}; svg.classList.add('grabbing'); };
+  const down = e => { if(GL.mode!=='globe') return; AUTOCAM=false; if(autoBtn) autoBtn.classList.remove('on'); drag = {x:(e.touches?e.touches[0]:e).clientX, y:(e.touches?e.touches[0]:e).clientY, lam:GL.lam, phi:GL.phi}; svg.classList.add('grabbing'); };
   const move = e => {
     if(!drag) return;
     const t = e.touches?e.touches[0]:e;
@@ -389,6 +532,12 @@ function mapControls(){
   svg.addEventListener('touchstart',down,{passive:true}); svg.addEventListener('touchmove',move,{passive:false}); addEventListener('touchend',up);
 }
 
+function zoom(f){
+  GL.z = Math.max(0.75, Math.min(ZMAX, GL.z * f));
+  AUTOCAM = false; autoBtn && autoBtn.classList.remove('on');
+  fitMap(); renderMap();
+}
+
 function ping(x,y){
   if(REDUCED) return;
   const NS='http://www.w3.org/2000/svg';
@@ -398,21 +547,33 @@ function ping(x,y){
   $('#gLive').appendChild(c);
   setTimeout(()=>c.remove(), 1200);
 }
-function comet(path){
+/* a plane for flights, a ship for cruises, a train for rail — not a dot
+   (Nicholas 2026-11-01) */
+const GLYPH = { f:'\u2708', c:'\uD83D\uDEF3', r:'\uD83D\uDE86', b:'\uD83D\uDE8C' };
+function comet(path, type){
   if(REDUCED) return;
   const NS='http://www.w3.org/2000/svg';
   let len = 0; try{ len = path.getTotalLength(); }catch(e){}
   if(!len) return;
-  const c = document.createElementNS(NS,'circle');
-  c.setAttribute('r',2.6); c.setAttribute('class','comet');
-  $('#gLive').appendChild(c);
-  const t0 = performance.now(), dur = 900;
+  const g = document.createElementNS(NS,'text');
+  g.setAttribute('class','vehicle v-'+(type||'f'));
+  g.textContent = GLYPH[type] || GLYPH.f;
+  $('#gLive').appendChild(g);
+  const t0 = performance.now(), dur = 1500;
   const step = t => {
     const f = Math.min(1,(t-t0)/dur);
-    let p; try{ p = path.getPointAtLength(path.getTotalLength()*f); }catch(e){ c.remove(); return; }
-    c.setAttribute('cx',p.x); c.setAttribute('cy',p.y);
-    c.setAttribute('opacity', 1-f*0.7);
-    if(f<1) requestAnimationFrame(step); else c.remove();
+    let L, p, q;
+    try{
+      L = path.getTotalLength();
+      if(!L){ g.remove(); return; }
+      p = path.getPointAtLength(L*f);
+      q = path.getPointAtLength(Math.min(L, L*f + Math.max(1, L*0.02)));
+    }catch(e){ g.remove(); return; }
+    const ang = Math.atan2(q.y-p.y, q.x-p.x) * 180/Math.PI;
+    const rot = (type==='f') ? ang + 45 : 0;        /* the plane glyph points NE */
+    g.setAttribute('transform', `translate(${p.x},${p.y}) rotate(${rot})`);
+    g.setAttribute('opacity', f<.08 ? f/.08 : (f>.92 ? (1-f)/.08 : 1));
+    if(f<1) requestAnimationFrame(step); else g.remove();
   };
   requestAnimationFrame(step);
 }
@@ -429,10 +590,11 @@ function syncMap(idx, animate){
       if(on && animate){
         a.el.classList.add('hot'); setTimeout(()=>a.el.classList.remove('hot'), 1400);
         const mid = gcMid(a.m.a, a.m.b);
-        aimAt(mid[0], mid[1], 900);
-        setTimeout(()=>comet(a.el), 520);
+        aimAt(mid[0], mid[1], 900, zForSpan(angDist(a.m.a, a.m.b) * 1.45));
+        setTimeout(()=>comet(a.el, a.m.t), 520);
         const k = a.m.b[0].toFixed(2)+','+a.m.b[1].toFixed(2);
         if(nodes[k]) ping(nodes[k].x, nodes[k].y);
+        tagMove(a.m);
       }
     }
     if(on){ a.el.classList.remove('hot'); if(a.m.t==='f')f++; else if(a.m.t==='c')c++; else r++; }
@@ -442,6 +604,7 @@ function syncMap(idx, animate){
   $('#nFl').textContent=f; $('#nCr').textContent=c; $('#nRl').textContent=r;
   const d = D.days[idx];
   $('#mapNow').textContent = d ? (d.city ? d.city : (d.ccs[0] ? nameOf(d.ccs[0]) : '')) : '';
+  if(d) setHot(d.ccs || []);
   lastIdx = idx;
 }
 
