@@ -365,7 +365,11 @@ function fitMap(){
     if(oc) oc.setAttribute('r', r1(GL.r));
     svg.setAttribute('viewBox', `${GL.cx-FRAME/2} ${GL.cy-FRAME/2} ${FRAME} ${FRAME}`);
     const narrow = innerWidth < 760;
-    svg.style.width  = narrow ? '100%' : Math.min(innerHeight*0.74, 720) + 'px';
+    const side = Math.min(innerHeight*0.74, 720);
+    /* shrink the card to the globe on desktop so there is no dead gutter
+       either side of the square once it is zoomed in */
+    if(box){ box.style.maxWidth = narrow ? '' : side + 'px'; box.style.margin = narrow ? '' : '0 auto 30px'; }
+    svg.style.width  = narrow ? '100%' : side + 'px';
     svg.style.height = 'auto';          /* square viewBox => square box */
     svg.style.aspectRatio = '';
     svg.style.maxWidth = '100%';
@@ -373,6 +377,7 @@ function fitMap(){
     svg.style.display = 'block';
   } else {
     svg.setAttribute('viewBox', `0 0 ${MAPW} ${MAPH}`);
+    if(box){ box.style.maxWidth=''; box.style.margin=''; }
     svg.style.aspectRatio=''; svg.style.width='100%'; svg.style.height='auto';
     svg.style.maxWidth=''; svg.style.margin=''; svg.style.display='block';
   }
