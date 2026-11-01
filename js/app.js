@@ -144,14 +144,15 @@ function wire(){
   btn.addEventListener('click',()=>{
     if(timer){ stop(); return; }
     btn.classList.add('playing'); btn.innerHTML = '❚❚<span>Pause</span>';
+    const END = Math.max(1, D.days.findIndex(x=>x.d===D.today));
     let i = +scrub.value;
-    if(i >= D.days.length-1) i = 0;
+    if(i >= END) i = 0;
     timer = setInterval(()=>{
       setReadout(i,true); scrub.value = i;
       const t = tiles[i];
       if(i%7===0) t.scrollIntoView({block:'nearest',inline:'center',behavior:'smooth'});
       i++;
-      if(i>=D.days.length) stop();
+      if(i>END) stop();
     }, speed);
   });
   function stop(){ clearInterval(timer); timer=null; btn.classList.remove('playing'); btn.innerHTML='▶<span>Play the year</span>'; }
