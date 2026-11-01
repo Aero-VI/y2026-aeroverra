@@ -1,75 +1,63 @@
-/* 2026.aeroverra.com — the year in motion  (v12) */
+/* 2026.aeroverra.com — year in motion  (v14) */
 
-const RM = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-/* ---------- palette: 6 headline, supporting, neutral long tail ---------- */
-const TIER1 = { US:'#3b6dff', JP:'#ff3864', SEA:'#14cfe0', AU:'#ff9f1c', MT:'#a855f7', ES:'#22c55e' };
-const TIER2 = { GB:'#e879f9', HU:'#84cc16', SG:'#f59e0b', CH:'#ef4444', DK:'#38bdf8', AT:'#fb7185' };
-const NEUTRALS = ['#5b6480','#66708c','#515a74','#6d7794','#4a5268'];
-
-const KINDWORD = {
-  flight:'in the air', hotel:'checked in', home:'home', cruise:'on a ship',
-  port:'port call', sea:'at sea', rail:'on the rails', stay:'staying put'
+const COLORS = {
+  US:'#3b6dff', JP:'#ff3864', SEA:'#14cfe0', AU:'#ff9f1c', MT:'#a855f7', ES:'#22c55e',
+  GB:'#e879f9', HU:'#84cc16', SG:'#f59e0b', CH:'#ef4444', DK:'#38bdf8', AT:'#fb7185',
+  ID:'#84cc16', SE:'#60a5fa', DE:'#fbbf24', BS:'#34d399', NO:'#818cf8', FI:'#f472b6',
+  EE:'#2dd4bf', LV:'#fb7185', PL:'#c084fc', BE:'#facc15', RS:'#4ade80', MA:'#fb923c',
+  CA:'#93c5fd', NL:'#fdba74', GI:'#f87171', ZW:'#f59e0b'
 };
-const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const NAMES = { ZW:'Zimbabwe', BW:'Botswana', GB:'United Kingdom', ES:'Spain' };
+const MONTHS  = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const MONTHSL = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
-let D = null, LAND = null, META = {}, COLOR = {}, byDate = {}, isolate = null;
-let tiles = [], TODAY_I = 0, cur = 0;
+let D = null, META = {}, byDate = {}, isolate = null;
 
-const $ = s => document.querySelector(s);
+const $  = s => document.querySelector(s);
 const el = (t,c,h) => { const e=document.createElement(t); if(c)e.className=c; if(h!==undefined)e.innerHTML=h; return e; };
-const svgEl = (t,a={}) => { const e=document.createElementNS('http://www.w3.org/2000/svg',t); for(const k in a) e.setAttribute(k,a[k]); return e; };
-const col = cc => COLOR[cc] || '#242838';
-const dObj = s => new Date(s+'T12:00:00Z');
+const HEAD = new Set(['US','JP','SEA','AU','MT','ES','GB','HU','SG','CH','DK','AT']);
+/* Cadence note: 26 bright hues collided. Headline + supporting keep their colour,
+   the one and two day countries all drop to neutral so the eye only tracks what matters. */
+const col = cc => !cc ? '#242838' : (HEAD.has(cc) ? COLORS[cc] : hsl(cc));
+const NEUTRALS=['#5b6480','#66708c','#515a74','#6d7794','#4a5268'];
+function hsl(cc){ let h=0; for(const ch of cc) h=(h*31+ch.charCodeAt(0))%97; return NEUTRALS[h%NEUTRALS.length]; }
+const dObj   = s => new Date(s+'T12:00:00Z');
 const pretty = s => { const d=dObj(s); return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getUTCDay()]+' '+d.getUTCDate()+' '+MONTHSL[d.getUTCMonth()]; };
-const shortd = s => { const d=dObj(s); return d.getUTCDate()+' '+MONTHS[d.getUTCMonth()]; };
+const short  = s => { const d=dObj(s); return d.getUTCDate()+' '+MONTHS[d.getUTCMonth()]; };
+const flagOf = cc => cc && cc.length===2 ? cc.toUpperCase().replace(/./g,c=>String.fromCodePoint(0x1F1E6+c.charCodeAt(0)-65)) : '🗓️';
+const nameOf = cc => (META[cc] && META[cc].name) || NAMES[cc] || cc || 'Unlogged';
+const dayDiff = (a,b) => Math.round((dObj(b)-dObj(a))/864e5);
+const MOBILE = () => window.matchMedia('(max-width:720px)').matches;
+const REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-Promise.all([
-  fetch('data/year2026.json?v=12').then(r=>r.json()),
-  fetch('data/land.json?v=1').then(r=>r.json())
-]).then(([data,land])=>{
-  D = data; LAND = land;
-  let ni = 0;
-  D.countries.forEach(c => {
-    META[c.cc] = c;
-    COLOR[c.cc] = TIER1[c.cc] || TIER2[c.cc] || NEUTRALS[(ni++)%NEUTRALS.length];
-  });
-  D.days.forEach((d,i) => { byDate[d.d] = d; d._i = i; });
-  TODAY_I = Math.max(0, D.days.findIndex(x=>x.d===D.today));
+fetch('data/year2026.json?v=14').then(r=>r.json()).then(data=>{
+  D = data;
+  D.countries.forEach(c => META[c.cc] = c);
+  D.days.forEach(d => byDate[d.d] = d);
+  heroStats(); buildNowNext(); buildRibbon(); buildLegend();
+  buildBoard('all'); buildMonths(); buildCards(); buildStreaks(); buildShips();
+  $('#genline').textContent = 'Data current to '+pretty(D.today).replace(/^\w+ /,'')+' 2026.';
+  wire(); reveal();
+  return fetch('data/land.json?v=14').then(r=>r.json());
+}).then(land => { drawMap(land); syncMap(+$('#scrub').value); });
 
-  heroStats();
-  buildMap();
-  buildRibbon();
-  buildLegend();
-  buildBoard('all');
-  buildMonths();
-  buildCards();
-  buildStreaks();
-  buildShips();
-  wire();
-  observe();
-
-  $('#genline').textContent = 'Data current to 1 November 2026.';
-  goTo(TODAY_I, false);
-});
-
-/* ================= hero ================= */
+/* ---------------- hero ---------------- */
 function heroStats(){
   const s = D.stats;
   const items = [
-    [s.countries_total,'countries'], [s.days_tracked,'days mapped'], [s.days_abroad,'days abroad'],
-    [s.flights,'flights'], [s.cruise_nights,'nights at sea'], [s.switches,'border hops']
+    [s.countries_total, 'countries'], [s.days_tracked, 'days mapped'],
+    [s.days_abroad, 'days abroad'],   [s.flights, 'flights'],
+    [s.cruise_nights, 'nights at sea'], [s.switches, 'border hops']
   ];
   const box = $('#heroStats');
   items.forEach(([n,l],i)=>{
-    const c = el('div','chip',`<b>0</b><span>${l}</span>`);
+    const c = el('div','chip',`<b data-n="${n}">0</b><span>${l}</span>`);
     box.appendChild(c);
     countUp(c.querySelector('b'), n, 900 + i*110);
   });
 }
 function countUp(node, to, dur){
-  if(RM){ node.textContent = to; return; }
+  if(REDUCED){ node.textContent = to; return; }
   const t0 = performance.now();
   const step = t => {
     const p = Math.min(1,(t-t0)/dur), e = 1-Math.pow(1-p,3);
@@ -79,15 +67,149 @@ function countUp(node, to, dur){
   requestAnimationFrame(step);
 }
 
-/* ================= map ================= */
-const MW = 1200, MH = 500, LAT_TOP = 83, LAT_BOT = -58;
-const projX = lon => (lon+180)/360*MW;
-const projY = lat => (LAT_TOP - Math.max(LAT_BOT,Math.min(LAT_TOP,lat)))/(LAT_TOP-LAT_BOT)*MH;
-let MOVES = [], NODES = {}, hotTimer = null;
+/* ---------------- here now / here next ---------------- */
+function buildNowNext(){
+  const n = D.now, box = $('#nowStrip');
+  if(!box) return;
+  if(n && n.cc){
+    const days = dayDiff(n.since, n.date) + 1;
+    box.innerHTML =
+      `<div class="nf">${META[n.cc] ? META[n.cc].flag : flagOf(n.cc)}</div>
+       <div class="nb">
+         <div class="lbl"><i></i>here now</div>
+         <div class="ct">${n.city ? n.city+', ' : ''}${nameOf(n.cc)}</div>
+         <div class="sub">${n.label ? n.label.charAt(0).toUpperCase()+n.label.slice(1) : 'in country'} · since ${short(n.since)}</div>
+       </div>
+       <div class="ctr"><b>${days}</b><s>${days===1?'day':'days'} in ${nameOf(n.cc)}</s></div>`;
+  } else {
+    box.innerHTML = `<div class="nf">🌊</div><div class="nb"><div class="lbl"><i></i>here now</div>
+      <div class="ct">At sea</div><div class="sub">no country under his feet today</div></div>`;
+  }
 
-function gcPoints(a,b,n){
-  const R = Math.PI/180;
-  const la1=a[0]*R, lo1=a[1]*R, la2=b[0]*R, lo2=b[1]*R;
+  const rail = $('#nextRail');
+  const list = (D.next || []).filter(x => x.end >= D.today).slice(0,5);
+  if(!list.length){ rail.innerHTML = `<div class="nxt planned"><div class="wh">next</div>
+    <div class="fl">🕳️</div><div class="pl">Nothing booked</div>
+    <div class="lb">The calendar past today is genuinely empty. That never lasts.</div></div>`; return; }
+
+  list.forEach((x,i)=>{
+    const away = Math.max(0, dayDiff(D.today, x.start));
+    const span = dayDiff(x.start, x.end) + 1;
+    const c = el('div','nxt'+(x.status==='planned'?' planned':''));
+    c.innerHTML =
+      `<div class="wh">${i===0?'up next':'then'}</div>
+       <div class="cd">${away===0?'<b>today</b>':`<b>${away}</b>${away===1?'day':'days'} out`}</div>
+       <div class="fl">${flagOf(x.cc)}</div>
+       <div class="pl">${x.city || nameOf(x.cc)}</div>
+       <div class="dt">${x.start===x.end ? short(x.start) : short(x.start)+' → '+short(x.end)+'  ·  '+span+' days'}</div>
+       <div class="lb">${x.label||''}</div>
+       ${x.src?`<div class="src">${x.src}</div>`:''}`;
+    if(x.status!=='planned') c.style.setProperty('--k', col(x.cc));
+    rail.appendChild(c);
+  });
+}
+
+/* ---------------- ribbon ---------------- */
+let tiles = [];
+function buildRibbon(){
+  const rb = $('#ribbon'), mr = $('#monthRow');
+  tiles = [];
+  rb.innerHTML = ''; mr.innerHTML = '';
+
+  const mkTile = (d, idx) => {
+    const t = el('div','day');
+    const cc = d.ccs[0];
+    if(d.future) t.classList.add('future');
+    else if(cc) t.style.background = col(cc);
+    if(d.ccs[1]) t.style.background = `linear-gradient(135deg,${col(d.ccs[0])} 50%,${col(d.ccs[1])} 50%)`;
+    t.dataset.i = idx;
+    t.addEventListener('mouseenter', e => { showTip(e,d); setReadout(idx,false); });
+    t.addEventListener('mouseleave', hideTip);
+    t.addEventListener('click', ()=>{ setReadout(idx,true); $('#scrub').value = idx; syncMap(idx); });
+    tiles[idx] = t;
+    return t;
+  };
+
+  if(MOBILE()){
+    /* phones: twelve month blocks, nothing cut off */
+    rb.classList.add('bymonth'); mr.style.display = 'none';
+    for(let m=0;m<12;m++){
+      const blk = el('div','mb');
+      blk.appendChild(el('div','mbl', MONTHSL[m]));
+      const grid = el('div','mbg');
+      const firstIdx = D.days.findIndex(d=>dObj(d.d).getUTCMonth()===m);
+      const pad = dObj(D.days[firstIdx].d).getUTCDay();
+      for(let i=0;i<pad;i++) grid.appendChild(el('div','day blank'));
+      D.days.forEach((d,idx)=>{ if(dObj(d.d).getUTCMonth()===m) grid.appendChild(mkTile(d,idx)); });
+      blk.appendChild(grid); rb.appendChild(blk);
+    }
+    $('#ribHint').textContent = 'Tap any day for the detail';
+  } else {
+    const first = dObj(D.days[0].d).getUTCDay();
+    for(let i=0;i<first;i++) rb.appendChild(el('div','day blank'));
+    D.days.forEach((d,idx)=> rb.appendChild(mkTile(d,idx)));
+    const seen = {};
+    D.days.forEach((d,idx)=>{ const m = dObj(d.d).getUTCMonth(); if(seen[m]===undefined) seen[m] = Math.floor((idx+first)/7); });
+    for(let c=0;c<53;c++){
+      const m = Object.keys(seen).find(k=>+seen[k]===c);
+      mr.appendChild(el('div','', m!==undefined ? MONTHS[m] : ''));
+    }
+  }
+
+  $('#scrub').max = D.days.length-1;
+  const ti = D.days.findIndex(x=>x.d===D.today);
+  if(ti>=0){ setReadout(ti,true); $('#scrub').value = ti; }
+}
+
+function setReadout(idx, lock){
+  const d = D.days[idx]; if(!d) return;
+  const cc = d.ccs[0];
+  const m = META[cc] || {flag:'🗓️', name:'Unlogged'};
+  const fe = $('#roFlag');
+  const nf = d.future ? '🔮' : m.flag;
+  if(fe.textContent !== nf && !REDUCED){ fe.classList.remove('pop'); void fe.offsetWidth; fe.classList.add('pop'); }
+  fe.textContent = nf;
+  $('#roDate').textContent = pretty(d.d) + (d.future ? ' · still to come' : '');
+  $('#roCountry').textContent = d.ccs.length>1
+      ? d.ccs.map(c=>nameOf(c)).join('  →  ')
+      : (cc ? m.name : 'No booking on file');
+  $('#roLabel').textContent = d.label || (d.future ? 'not booked yet' : '—');
+  const c = $('#roCount');
+  if(cc && cc!=='SEA' && META[cc]) c.innerHTML = `<b>${META[cc].days}</b>days in ${META[cc].name} this year`;
+  else if(cc==='SEA') c.innerHTML = `<b>${D.stats.days_sea}</b>sea days this year`;
+  else c.innerHTML = '';
+  const r = $('#readout');
+  r.style.borderColor = cc ? col(cc)+'88' : '';
+  r.style.boxShadow = cc ? `0 0 44px -16px ${col(cc)}` : '';
+  tiles.forEach(t=>t && t.classList.remove('now'));
+  if(tiles[idx]) tiles[idx].classList.add('now');
+}
+
+/* ---------------- legend ---------------- */
+function buildLegend(){
+  const lg = $('#legend'), tl = $('#legendTail');
+  const live = D.countries.filter(c=>c.days>0);
+  const head = live.filter(c=>c.days>=3), tail = live.filter(c=>c.days<3);
+  const mk = (c, small) => {
+    const b = el('div','lg'+(small?' sm':''),`<i style="background:${col(c.cc)}"></i>${c.flag} ${c.name} <b>${c.days}</b>`);
+    b.addEventListener('click',()=>{
+      isolate = (isolate===c.cc) ? null : c.cc;
+      document.querySelectorAll('.lg').forEach(x=>x.classList.toggle('off', !!isolate && x!==b));
+      tiles.forEach((t,i)=>{ if(!t) return; t.classList.toggle('dim', !!isolate && !D.days[i].ccs.includes(isolate)); });
+    });
+    return b;
+  };
+  head.forEach(c=>lg.appendChild(mk(c,false)));
+  tail.forEach(c=>tl.appendChild(mk(c,true)));
+}
+
+/* ---------------- the map ---------------- */
+const MAPW = 1200, MAPH = 500, LAT_N = 84, LAT_S = -58;
+const px = (lat,lon) => [ (lon+180)/360*MAPW, (LAT_N-lat)/(LAT_N-LAT_S)*MAPH ];
+const R = Math.PI/180;
+
+function gc(a, b, n){            /* great circle, lat/lon pairs */
+  const [la1,lo1]=[a[0]*R,a[1]*R], [la2,lo2]=[b[0]*R,b[1]*R];
   const d = 2*Math.asin(Math.sqrt(Math.sin((la2-la1)/2)**2 + Math.cos(la1)*Math.cos(la2)*Math.sin((lo2-lo1)/2)**2));
   if(!d) return [a,b];
   const out=[];
@@ -100,282 +222,158 @@ function gcPoints(a,b,n){
   }
   return out;
 }
-function arcPath(m){
-  const N = 60, pts = gcPoints(m.a,m.b,N);
-  const p0=[projX(m.a[1]),projY(m.a[0])], p1=[projX(m.b[1]),projY(m.b[0])];
-  let dx = Math.abs(p1[0]-p0[0]); if(dx > MW/2) dx = MW - dx;
-  const dist = Math.hypot(dx, p1[1]-p0[1]);
-  const lift = Math.min(140, dist * (m.t==='f' ? .15 : .05));
-  let d='', prev=null;
-  pts.forEach((p,i)=>{
-    const f=i/N;
-    const x = projX(p[1]);
-    const y = projY(p[0]) - Math.sin(Math.PI*f)*lift;
-    if(prev===null || Math.abs(x-prev) > MW/2) d += `M${x.toFixed(1)},${y.toFixed(1)}`;
-    else d += `L${x.toFixed(1)},${y.toFixed(1)}`;
-    prev = x;
+function pathOf(a, b){            /* splits at the antimeridian */
+  const pts = gc(a,b,64).map(p=>px(p[0],p[1]));
+  let dstr='', prev=null;
+  pts.forEach(p=>{
+    if(prev && Math.abs(p[0]-prev[0]) > MAPW/2) dstr += ` M${p[0].toFixed(1)},${p[1].toFixed(1)}`;
+    else dstr += (prev?' L':'M')+p[0].toFixed(1)+','+p[1].toFixed(1);
+    prev=p;
   });
-  return d;
+  return dstr;
 }
 
-function buildMap(){
-  const gLand = $('#gLand');
-  LAND.forEach(ring=>{
+let arcs = [], nodes = {}, mapReady = false;
+function drawMap(land){
+  const gL = $('#gLand'), gA = $('#gArcs'), gN = $('#gNodes');
+  const NS = 'http://www.w3.org/2000/svg';
+  land.forEach(ring=>{
     let d='';
-    ring.forEach((p,i)=>{ d += (i?'L':'M') + projX(p[0]).toFixed(1) + ',' + projY(p[1]).toFixed(1); });
-    gLand.appendChild(svgEl('path',{d:d+'Z'}));
+    ring.forEach((pt,i)=>{ const [x,y]=px(pt[1],pt[0]); d += (i?'L':'M')+x.toFixed(1)+','+y.toFixed(1); });
+    const p = document.createElementNS(NS,'path'); p.setAttribute('d', d+'Z'); gL.appendChild(p);
   });
 
-  const gArcs = $('#gArcs'), gNodes = $('#gNodes');
-  const key = p => p[0].toFixed(3)+','+p[1].toFixed(3);
-
-  D.moves.forEach(m=>{
-    const di = byDate[m.d] ? byDate[m.d]._i : -1;
-    if(di < 0) return;
-    const p = svgEl('path',{class:'arc '+m.t, d:arcPath(m)});
-    gArcs.appendChild(p);
-    let len = 0; try{ len = p.getTotalLength(); }catch(e){}
-    const rec = {m, di, p, len, on:false};
-    p.addEventListener('mouseenter', e=>{
-      $('#tip').innerHTML = `<b>${m.n||''} · ${shortd(m.d)}</b>${m.ac||m.al} → ${m.bc||m.bl}`;
-      const r = p.getBoundingClientRect();
-      $('#tip').style.left = (r.left+r.width/2)+'px';
-      $('#tip').style.top = (r.top+r.height/2)+'px';
-      $('#tip').style.opacity = 1;
-    });
-    p.addEventListener('mouseleave', hideTip);
-    MOVES.push(rec);
-
-    [[m.a,m.al,m.ac],[m.b,m.bl,m.bc]].forEach(([pt,lab,city])=>{
-      const k = key(pt);
-      if(!NODES[k]){
-        const c = svgEl('circle',{class:'nd', cx:projX(pt[1]).toFixed(1), cy:projY(pt[0]).toFixed(1), r:2.2});
-        gNodes.appendChild(c);
-        NODES[k] = {c, di, label:city||lab, x:projX(pt[1]), y:projY(pt[0])};
-      } else if(di < NODES[k].di) NODES[k].di = di;
+  D.moves.forEach((m,i)=>{
+    const p = document.createElementNS(NS,'path');
+    p.setAttribute('d', pathOf(m.a, m.b));
+    p.setAttribute('class','arc '+m.t);
+    gA.appendChild(p);
+    arcs.push({el:p, m, len:0});
+    [[m.a,m.al],[m.b,m.bl]].forEach(([c,lbl])=>{
+      const k = c[0].toFixed(2)+','+c[1].toFixed(2);
+      if(nodes[k]) return;
+      const [x,y]=px(c[0],c[1]);
+      const ci = document.createElementNS(NS,'circle');
+      ci.setAttribute('cx',x); ci.setAttribute('cy',y); ci.setAttribute('r',2.2);
+      ci.setAttribute('class','nd'); gN.appendChild(ci);
+      nodes[k] = {el:ci, x, y, lbl};
     });
   });
-  MOVES.sort((a,b)=>a.di-b.di);
+  mapReady = true;
 }
 
-function syncMap(i, animate){
-  let nf=0, nc=0, nr=0, last=null;
-  MOVES.forEach(r=>{
-    const should = r.di <= i;
-    if(should && !r.on){
-      r.on = true;
-      if(animate && !RM && r.len){
-        r.p.style.transition = 'none';
-        r.p.style.strokeDasharray = r.len;
-        r.p.style.strokeDashoffset = r.len;
-        r.p.classList.add('on','hot');
-        void r.p.getBoundingClientRect();
-        const dur = Math.max(260, Math.min(1100, r.len*2.2));
-        r.p.style.transition = `stroke-dashoffset ${dur}ms cubic-bezier(.3,.7,.3,1), opacity .3s`;
-        r.p.style.strokeDashoffset = 0;
-        comet(r, dur);
-        ping(r);
-        clearTimeout(hotTimer);
-        hotTimer = setTimeout(()=>r.p.classList.remove('hot'), dur+500);
-      } else {
-        r.p.style.transition='none'; r.p.style.strokeDasharray='none'; r.p.style.strokeDashoffset=0;
-        r.p.classList.add('on');
-      }
-    } else if(!should && r.on){
-      r.on = false;
-      r.p.style.transition='none';
-      r.p.classList.remove('on','hot');
-      if(r.len){ r.p.style.strokeDasharray=r.len; r.p.style.strokeDashoffset=r.len; }
-    }
-    if(r.on){
-      if(r.m.t==='f') nf++; else if(r.m.t==='c') nc++; else nr++;
-      if(!last || r.di >= last.di) last = r;
-    }
-  });
-  for(const k in NODES){
-    const n = NODES[k];
-    n.c.classList.toggle('on', n.di <= i);
-  }
-  $('#nFl').textContent = nf; $('#nCr').textContent = nc; $('#nRl').textContent = nr;
-  $('#mapNow').textContent = last ? `${last.m.ac||last.m.al} → ${last.m.bc||last.m.bl}` : '';
+function ping(x,y){
+  if(REDUCED) return;
+  const NS='http://www.w3.org/2000/svg';
+  const c = document.createElementNS(NS,'circle');
+  c.setAttribute('cx',x); c.setAttribute('cy',y); c.setAttribute('r',2);
+  c.setAttribute('class','ndring ping');
+  $('#gLive').appendChild(c);
+  setTimeout(()=>c.remove(), 1200);
 }
-
-function comet(r, dur){
-  const g = $('#gLive');
-  const c = svgEl('circle',{class:'comet', r:3.2, cx:0, cy:0});
-  g.appendChild(c);
-  const t0 = performance.now();
-  const step = t=>{
+function comet(path){
+  if(REDUCED) return;
+  const NS='http://www.w3.org/2000/svg';
+  const len = path.getTotalLength(); if(!len) return;
+  const c = document.createElementNS(NS,'circle');
+  c.setAttribute('r',2.6); c.setAttribute('class','comet');
+  $('#gLive').appendChild(c);
+  const t0 = performance.now(), dur = 850;
+  const step = t => {
     const f = Math.min(1,(t-t0)/dur);
-    try{ const p = r.p.getPointAtLength(r.len*f); c.setAttribute('cx',p.x); c.setAttribute('cy',p.y); }catch(e){}
+    const p = path.getPointAtLength(len*f);
+    c.setAttribute('cx',p.x); c.setAttribute('cy',p.y);
+    c.setAttribute('opacity', 1-f*0.7);
     if(f<1) requestAnimationFrame(step); else c.remove();
   };
   requestAnimationFrame(step);
 }
-function ping(r){
-  const g = $('#gLive');
-  try{
-    const p = r.p.getPointAtLength(r.len);
-    const c = svgEl('circle',{class:'ndring ping', cx:p.x, cy:p.y, r:2});
-    g.appendChild(c);
-    setTimeout(()=>c.remove(), 1200);
-  }catch(e){}
-}
 
-/* ================= ribbon ================= */
-let ribMode = null;
-function wantMode(){ return window.innerWidth < 720 ? 'month' : 'cal'; }
-
-function buildRibbon(){
-  const mode = wantMode();
-  if(mode === ribMode) return;
-  ribMode = mode;
-  const rb = $('#ribbon'), mr = $('#monthRow');
-  rb.innerHTML=''; mr.innerHTML=''; tiles = [];
-
-  const mk = (d, idx) => {
-    const t = el('div','day');
-    const cc = d.ccs[0];
-    if(d.future) t.classList.add('future');
-    else if(cc) t.style.background = col(cc);
-    if(d.ccs[1] && !d.future) t.style.background = `linear-gradient(135deg,${col(d.ccs[0])} 50%,${col(d.ccs[1])} 50%)`;
-    t.dataset.i = idx;
-    t.addEventListener('mouseenter', e => { if(matchMedia('(hover:hover)').matches){ showTip(e,d); goTo(idx,false,true); } });
-    t.addEventListener('mouseleave', hideTip);
-    t.addEventListener('click', e => { showTip(e,d); goTo(idx,false); setTimeout(hideTip, 2600); });
-    tiles[idx] = t;
-    return t;
-  };
-
-  if(mode === 'cal'){
-    rb.classList.remove('bymonth');
-    const first = dObj(D.days[0].d).getUTCDay();
-    for(let i=0;i<first;i++) rb.appendChild(el('div','day blank'));
-    D.days.forEach((d,idx)=> rb.appendChild(mk(d,idx)));
-    const seen = {};
-    D.days.forEach((d,idx)=>{ const m = dObj(d.d).getUTCMonth(); if(seen[m]===undefined) seen[m] = Math.floor((idx+first)/7); });
-    for(let c=0;c<53;c++){
-      const m = Object.keys(seen).find(k=>+seen[k]===c);
-      mr.appendChild(el('div','', m!==undefined ? MONTHS[m] : ''));
+let lastIdx = -1;
+function syncMap(idx, animate){
+  if(!mapReady) return;
+  const upto = D.days[idx] ? D.days[idx].d : D.today;
+  let f=0,c=0,r=0;
+  arcs.forEach(a=>{
+    const on = a.m.d <= upto;
+    if(on !== a.el.classList.contains('on')){
+      a.el.classList.toggle('on', on);
+      if(on && animate){
+        a.el.classList.add('hot'); setTimeout(()=>a.el.classList.remove('hot'), 1400);
+        comet(a.el);
+        const k = a.m.b[0].toFixed(2)+','+a.m.b[1].toFixed(2);
+        if(nodes[k]) ping(nodes[k].x, nodes[k].y);
+      }
     }
-    $('#ribHint').textContent = 'Hover any day for the detail';
-  } else {
-    rb.classList.add('bymonth');
-    mr.style.display='none';
-    for(let m=0;m<12;m++){
-      const block = el('div','mb');
-      block.appendChild(el('div','mbl', MONTHSL[m]));
-      const g = el('div','mbg');
-      const days = D.days.filter(d=>dObj(d.d).getUTCMonth()===m);
-      const lead = dObj(days[0].d).getUTCDay();
-      for(let i=0;i<lead;i++) g.appendChild(el('div','day blank'));
-      days.forEach(d=> g.appendChild(mk(d, d._i)));
-      block.appendChild(g); rb.appendChild(block);
-    }
-    $('#ribHint').textContent = 'Tap any day for the detail';
-  }
-  applyIsolate();
-  if(tiles[cur]) tiles[cur].classList.add('now');
-}
-
-/* ================= the one timeline ================= */
-function goTo(i, animate, hoverOnly){
-  i = Math.max(0, Math.min(D.days.length-1, i));
-  const d = D.days[i];
-  if(!hoverOnly){ cur = i; $('#scrub').value = i; }
-  const cc = d.ccs[0];
-  const m = META[cc] || {flag:'🗓️', name:'Unlogged'};
-  const fe = $('#roFlag');
-  const nf = d.future ? '🔮' : m.flag;
-  if(fe.textContent !== nf && !RM){ fe.classList.remove('pop'); void fe.offsetWidth; fe.classList.add('pop'); }
-  fe.textContent = nf;
-  $('#roDate').textContent = pretty(d.d) + (d.future ? ' · still to come' : '');
-  $('#roCountry').textContent = d.ccs.length>1
-      ? d.ccs.map(c=>(META[c]||{name:c}).name).join('  →  ')
-      : (cc ? m.name : 'No booking on file');
-  $('#roLabel').textContent = d.label || (d.future ? 'not booked yet' : '—');
-  const c = $('#roCount');
-  if(cc && cc!=='SEA' && META[cc]) c.innerHTML = `<b>${META[cc].days}</b>days in ${META[cc].name} this year`;
-  else if(cc==='SEA') c.innerHTML = `<b>${D.stats.days_sea}</b>sea days this year`;
-  else c.innerHTML = '';
-  const r = $('#readout');
-  r.style.borderColor = cc ? col(cc)+'88' : '';
-  r.style.boxShadow = cc ? `0 0 44px -16px ${col(cc)}` : '';
-
-  if(!hoverOnly){
-    tiles.forEach(t=>t && t.classList.remove('now'));
-    if(tiles[i]) tiles[i].classList.add('now');
-    syncMap(i, !!animate);
-  }
-}
-
-/* ================= legend ================= */
-function buildLegend(){
-  const lg = $('#legend'), tl = $('#legendTail');
-  lg.innerHTML=''; tl.innerHTML='';
-  D.countries.filter(c=>c.days>0).forEach(c=>{
-    const small = c.tier===3;
-    const b = el('div','lg'+(small?' sm':''),
-      `<i style="background:${col(c.cc)}"></i>${c.flag} ${c.name} <b>${c.days}</b>`);
-    b.addEventListener('click',()=>{
-      isolate = (isolate===c.cc) ? null : c.cc;
-      applyIsolate();
-    });
-    b.dataset.cc = c.cc;
-    (small ? tl : lg).appendChild(b);
+    if(on){ a.el.classList.remove('hot'); if(a.m.t==='f')f++; else if(a.m.t==='c')c++; else r++; }
   });
-}
-function applyIsolate(){
-  document.querySelectorAll('.lg').forEach(x=>x.classList.toggle('off', !!isolate && x.dataset.cc!==isolate));
-  tiles.forEach((t,i)=>{ if(t) t.classList.toggle('dim', !!isolate && !D.days[i].ccs.includes(isolate)); });
+  arcs.forEach(a=>{ if(a.m.d<=upto){ const k1=a.m.a[0].toFixed(2)+','+a.m.a[1].toFixed(2), k2=a.m.b[0].toFixed(2)+','+a.m.b[1].toFixed(2);
+    if(nodes[k1]) nodes[k1].el.classList.add('on'); if(nodes[k2]) nodes[k2].el.classList.add('on'); } });
+  $('#nFl').textContent=f; $('#nCr').textContent=c; $('#nRl').textContent=r;
+  const d = D.days[idx];
+  $('#mapNow').textContent = d ? (d.city ? d.city : (d.ccs[0] ? nameOf(d.ccs[0]) : '')) : '';
+  lastIdx = idx;
 }
 
-/* ================= player ================= */
-let timer=null, speed=32;
+/* ---------------- player ---------------- */
+let timer=null, speed=70;   // default 1x (Nicholas 2026-11-01)
 function wire(){
   const btn = $('#playBtn'), scrub = $('#scrub');
-  scrub.max = D.days.length-1;
-
   function stop(){ clearInterval(timer); timer=null; btn.classList.remove('playing'); btn.innerHTML='▶<span>Play the year</span>'; }
-  function start(){
-    btn.classList.add('playing'); btn.innerHTML='❚❚<span>Pause</span>';
-    let i = cur >= TODAY_I ? 0 : cur;
-    if(i===0){ MOVES.forEach(r=>{ r.on=true; }); syncMap(-1,false); }
+  btn.addEventListener('click',()=>{
+    if(timer){ stop(); return; }
+    btn.classList.add('playing'); btn.innerHTML = '❚❚<span>Pause</span>';
+    const END = Math.max(1, D.days.findIndex(x=>x.d===D.today));
+    let i = +scrub.value;
+    if(i >= END) i = 0;
+    arcs.forEach(a=>a.el.classList.remove('on'));
+    Object.values(nodes).forEach(n=>n.el.classList.remove('on'));
     timer = setInterval(()=>{
-      goTo(i, true);
+      setReadout(i,true); scrub.value = i; syncMap(i, true);
       const t = tiles[i];
-      if(t && i%7===0 && ribMode==='cal') t.scrollIntoView({block:'nearest',inline:'center',behavior:RM?'auto':'smooth'});
+      if(t && i%7===0) keepVisible(t);
       i++;
-      if(i>TODAY_I) stop();
+      if(i>END) stop();
     }, speed);
-  }
-  btn.addEventListener('click',()=> timer ? stop() : start());
-
-  scrub.addEventListener('input',()=>{ if(timer) stop(); goTo(+scrub.value,false); });
+  });
+  scrub.addEventListener('input',()=>{ setReadout(+scrub.value,true); syncMap(+scrub.value); });
   document.querySelectorAll('.sp').forEach(b=>b.addEventListener('click',()=>{
     document.querySelectorAll('.sp').forEach(x=>x.classList.remove('on'));
     b.classList.add('on'); speed = +b.dataset.sp;
-    if(timer){ stop(); start(); }
+    if(timer){ stop(); $('#playBtn').click(); }
   }));
   document.querySelectorAll('.tg').forEach(b=>b.addEventListener('click',()=>{
     document.querySelectorAll('.tg').forEach(x=>x.classList.remove('on'));
     b.classList.add('on'); buildBoard(b.dataset.mode);
   }));
-
-  let rt=null;
-  window.addEventListener('resize',()=>{ clearTimeout(rt); rt=setTimeout(()=>{ buildRibbon(); goTo(cur,false); },180); });
+  let w = window.innerWidth;
+  window.addEventListener('resize',()=>{
+    if(Math.abs(window.innerWidth-w) < 80) return;
+    w = window.innerWidth;
+    const was = +$('#scrub').value;
+    $('#ribbon').classList.remove('bymonth'); $('#monthRow').style.display='';
+    buildRibbon(); setReadout(was,true); $('#scrub').value = was;
+  });
 }
 
-/* ================= leaderboard ================= */
+/* ---------------- reveal ---------------- */
+function reveal(){
+  const secs = document.querySelectorAll('.reveal');
+  if(!('IntersectionObserver' in window) || REDUCED){ secs.forEach(s=>s.classList.add('in')); return; }
+  const io = new IntersectionObserver(es=>es.forEach(e=>{ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } }), {rootMargin:'-60px'});
+  secs.forEach(s=>io.observe(s));
+}
+
+/* ---------------- leaderboard ---------------- */
 function buildBoard(mode){
   const box = $('#board'); box.innerHTML='';
   let list = D.countries.slice();
   if(mode==='nonus') list = list.filter(c=>c.cc!=='US');
   if(mode==='land')  list = list.filter(c=>c.cc!=='SEA');
-  const top = list.slice(0,10), tail = list.slice(10);
-  const max = Math.max(...top.map(c=>c.days));
+  const show = list.filter(c=>c.days>=3), tail = list.filter(c=>c.days<3);
+  const max = Math.max(...show.map(c=>c.days));
   const denom = D.stats.days_tracked;
-  top.forEach((c,i)=>{
+  show.forEach((c,i)=>{
     const r = el('div','row');
     r.innerHTML = `<div class="fl">${c.flag}</div>
       <div class="bar"><div class="fill" style="background:linear-gradient(90deg,${col(c.cc)},${col(c.cc)}99)"></div>
@@ -383,18 +381,16 @@ function buildBoard(mode){
       <div class="vl">${c.days}<s>${(c.days/denom*100).toFixed(0)}%</s></div>`;
     box.appendChild(r);
     const fill = r.querySelector('.fill');
-    const w = Math.max(4, c.days/max*100)+'%';
-    if(RM) fill.style.width = w;
-    else setTimeout(()=>{ fill.style.width = w; }, 60+i*45);
+    setTimeout(()=>{ fill.style.width = Math.max(4, c.days/max*100)+'%'; }, 40+i*35);
   });
   const tc = $('#tailChips'); tc.innerHTML='';
-  $('#tailHead').textContent = tail.length ? `The other ${tail.length}, a day or two each` : '';
-  tail.forEach(c=> tc.appendChild(el('div','tc',`${c.flag} ${c.name} <b>${c.days}</b>`)));
+  $('#tailHead').textContent = tail.length ? `The ${tail.length} flying visits — one or two days each` : '';
+  tail.forEach(c=>tc.appendChild(el('div','tc',`<span>${c.flag}</span>${c.name}<b>${c.days}</b>`)));
 }
 
-/* ================= month rail ================= */
+/* ---------------- month rail ---------------- */
 function buildMonths(){
-  const rail = $('#mrail'); rail.innerHTML='';
+  const rail = $('#mrail');
   const perMonth = {};
   D.days.forEach(d=>{
     if(d.future) return;
@@ -413,27 +409,44 @@ function buildMonths(){
       const s = el('div','seg');
       s.style.background = col(cc);
       s.style.height = Math.max(5, n/total*118)+'px';
-      s.style.animationDelay = (m*55+i*35)+'ms';
-      s.title = `${(META[cc]||{name:cc}).name}: ${n}`;
+      s.style.animationDelay = (m*60+i*40)+'ms';
+      s.title = `${nameOf(cc)}: ${n}`;
       bars.appendChild(s);
     });
     mo.appendChild(bars);
     mo.appendChild(el('div','n', land||'—'));
     mo.appendChild(el('div','lb', MONTHS[m]));
     mo.addEventListener('click',()=>{
-      const idx = D.days.findIndex(d=>dObj(d.d).getUTCMonth()===m);
-      goTo(idx,false);
-      document.getElementById('motion-sec').scrollIntoView({behavior:RM?'auto':'smooth',block:'start'});
+      const i = D.days.findIndex(d=>dObj(d.d).getUTCMonth()===m);
+      if(i<0) return;
+      $('#scrub').value = i; setReadout(i,true); syncMap(i);
+      const sec = document.getElementById('motion-sec');
+      const r = sec.getBoundingClientRect();
+      if(r.bottom < 80 || r.top > window.innerHeight - 80){
+        window.scrollTo({top: window.scrollY + r.top - 12, behavior:'smooth'});
+      }
     });
     rail.appendChild(mo);
   }
 }
 
-/* ================= cards ================= */
+
+/* keepVisible: nudge ONLY the ribbon's own horizontal scroller. Never touches the
+   window scroll position (that was the "page jumps around" bug). */
+function keepVisible(tile){
+  const box = document.getElementById('ribbonWrap');
+  if(!box) return;
+  if(box.scrollWidth <= box.clientWidth + 4) return;   // nothing to scroll (mobile wrap mode)
+  const target = tile.offsetLeft - (box.clientWidth/2) + (tile.offsetWidth/2);
+  const max = box.scrollWidth - box.clientWidth;
+  box.scrollTo({left: Math.max(0, Math.min(max, target)), behavior:'smooth'});
+}
+
+/* ---------------- cards ---------------- */
 function buildCards(){
-  const s = D.stats, box = $('#cards'); box.innerHTML='';
+  const s = D.stats, box = $('#cards');
   const longest = s.longest_runs[0];
-  const add = h => box.appendChild(el('div','card',h));
+  const add = (h)=>{ box.appendChild(el('div','card',h)); };
 
   add(`<h3>Longest stretch in one place</h3><div class="big">${longest.n} <span style="font-size:20px">days</span></div>
        <div class="sub">${longest.flag} ${longest.name}, starting ${pretty(longest.start)}. The next longest run anywhere
@@ -449,24 +462,24 @@ function buildCards(){
        and that is ${s.hotel_nights + s.cruise_nights} nights of 2026 paid for by the night.</div>`);
 
   add(`<h3>Water vs land</h3><div class="big">${s.days_sea}</div>
-       <div class="sub">days spent in no country at all, mid-ocean. That is more than he spent in any single European country
+       <div class="sub">days spent in no country at all, mid-ocean. More than he spent in any single European country
        this year.</div>`);
 
   add(`<h3>The split</h3><div class="big">${s.days_us} / ${s.days_abroad}</div>
        <div class="sub">days in the United States versus days on foreign soil. ${s.days_tracked} of
-       ${s.days_tracked + s.days_untracked} days is accounted for by a booking.</div>`);
+       ${s.days_tracked+s.days_untracked} elapsed days are accounted for by a booking.</div>`);
 }
 
-/* ================= streaks ================= */
+/* ---------------- streaks ---------------- */
 function buildStreaks(){
-  const box = $('#streaks'); box.innerHTML='';
+  const box = $('#streaks'); if(!box) return;
   const multi = D.days.filter(d=>!d.future && d.ccs.length>1).length;
-  const hop = D.days.filter(d=>!d.future && d.ccs.length>2).length;
+  const hop   = D.days.filter(d=>!d.future && d.ccs.length>2).length;
   const items = D.stats.longest_runs.slice(0,3).map(r=>
     ({f:r.flag, n:r.n, w:'day run', d:r.name+', from '+pretty(r.start), c:col(r.cc)}));
-  items.push({f:'🛬', n:multi, w:'two-country days', d:'days that started in one country and ended in another', c:'#14cfe0'});
-  items.push({f:'🤯', n:hop, w:'three-country days', d:'airport, airport, hotel, all before midnight', c:'#ff3864'});
-  items.push({f:'🧭', n:D.stats.switches, w:'border hops', d:'times the country under his feet changed', c:'#ff9f1c'});
+  items.push({f:'🛬', n:multi, w:'two-country days', d:'days that started in one country and ended in another', c:'#19d2e6'});
+  items.push({f:'🤯', n:hop, w:'three-country days', d:'airport, airport, hotel, all before midnight', c:'#ff4d6d'});
+  items.push({f:'🧭', n:D.stats.switches, w:'border hops', d:'times the country under his feet changed', c:'#ffc234'});
   items.forEach(it=>{
     const s = el('div','stk');
     s.innerHTML = `<i class="glow" style="background:${it.c}"></i><div class="f">${it.f}</div>
@@ -475,9 +488,9 @@ function buildStreaks(){
   });
 }
 
-/* ================= ships ================= */
+/* ---------------- ships ---------------- */
 function buildShips(){
-  const box = $('#ships'); box.innerHTML='';
+  const box = $('#ships');
   D.cruises.slice().sort((a,b)=>a.start.localeCompare(b.start)).forEach(c=>{
     const s = el('div','ship');
     s.innerHTML = `<div class="nt">${c.nights}</div>
@@ -488,22 +501,14 @@ function buildShips(){
   });
 }
 
-/* ================= reveal on scroll ================= */
-function observe(){
-  if(RM){ document.querySelectorAll('.reveal').forEach(s=>s.classList.add('in')); return; }
-  const io = new IntersectionObserver(es=>{
-    es.forEach(e=>{ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } });
-  },{threshold:.12});
-  document.querySelectorAll('.reveal').forEach(s=>io.observe(s));
-}
-
-/* ================= tooltip ================= */
+/* ---------------- tooltip ---------------- */
 function showTip(e,d){
+  if(MOBILE()) return;
   const t = $('#tip');
-  const names = d.ccs.map(c=>(META[c]||{}).flag+' '+(META[c]||{name:c}).name).join(' → ') || 'no booking';
+  const names = d.ccs.map(c=>(META[c]||{}).flag+' '+nameOf(c)).join(' → ') || 'no booking';
   t.innerHTML = `<b>${pretty(d.d)}</b>${names}${d.label?`<s>${d.label}</s>`:''}`;
-  const r = e.currentTarget.getBoundingClientRect();
-  t.style.left = Math.max(80, Math.min(window.innerWidth-80, r.left + r.width/2)) + 'px';
+  const r = e.target.getBoundingClientRect();
+  t.style.left = r.left + r.width/2 + 'px';
   t.style.top = r.top + 'px';
   t.style.opacity = 1;
 }

@@ -1,0 +1,16 @@
+{
+  "note": "Hand-maintained forward schedule for the HERE NOW / HERE NEXT strip. Keep it to things that are actually booked or actually planned, and mark which is which. Dates are local.",
+  "now": {
+    "city": "Barcelona",
+    "cc": "ES",
+    "country": "Spain",
+    "since": "2026-11-01",
+    "line": "Landed 09:10 on AA 742 out of Philadelphia. Car goes back to BCN T2 at 05:00 on the 3rd."
+  },
+  "next": [
+    { "city": "Out of Barcelona", "cc": "ES", "country": "Spain", "from": "2026-11-03", "to": "2026-11-03", "status": "booked", "line": "Rental back at Terminal 2, 05:00. Dawn exit." },
+    { "city": "Alicante", "cc": "ES", "country": "Spain", "from": "2026-11-04", "to": "2026-11-15", "status": "planned", "line": "House hunting. The long-stay plan." },
+    { "city": "Bulawayo + Victoria Falls", "cc": "ZW", "country": "Zimbabwe", "from": "2026-11-16", "to": "2026-11-24", "status": "booked", "line": "Horseback safari on a 50,000 acre ranch, then Chobe in Botswana. First time in Africa." },
+    { "city": "Chobe National Park", "cc": "BW", "country": "Botswana", "from": "2026-11-21", "to": "2026-11-21", "status": "booked", "line": "Day in the park, out of Victoria Falls." }
+  ]
+}
