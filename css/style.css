@@ -314,3 +314,19 @@ footer{max-width:1180px;margin:80px auto 0;padding:34px 20px 70px;border-top:1px
   .nf-link{margin-left:0}
 }
 @media (prefers-reduced-motion: reduce){ .nowstrip .lbl i{animation:none} }
+
+/* ---------- globe (2026-11-01) ---------- */
+#ocean{
+  fill:url(#oceanfill);stroke:rgba(120,170,255,.28);stroke-width:1;
+  filter:drop-shadow(0 0 40px rgba(60,120,255,.25))
+}
+.grat{fill:none;stroke:rgba(140,170,230,.10);stroke-width:.6;vector-effect:non-scaling-stroke}
+#map.grabbing{cursor:grabbing}
+#map{cursor:grab}
+.mapbtns{display:inline-flex;gap:6px;margin-left:4px}
+.mapbtns .mb{
+  appearance:none;cursor:pointer;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);
+  color:#9aa4bd;font:700 10px/1 ui-monospace,monospace;letter-spacing:.14em;border-radius:999px;padding:7px 10px
+}
+.mapbtns .mb.on{color:#fff;border-color:rgba(20,207,224,.55);background:rgba(20,207,224,.12)}
+.mapbtns .mb:hover{color:#fff}

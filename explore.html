@@ -8,7 +8,7 @@
 <meta property="og:title" content="2026 — The Year in Motion">
 <meta property="og:description" content="26 countries. 304 tracked days. 39 flights. 73 nights at sea. Every single day of 2026, coloured by where he woke up.">
 <meta property="og:type" content="website">
-<link rel="stylesheet" href="css/style.css?v=14">
+<link rel="stylesheet" href="css/style.css?v=15">
 </head>
 <body>
 
@@ -50,7 +50,8 @@
   <div class="sec-head">
     <h2>The Year in Motion</h2>
     <p>One timeline, two views. <strong>Press play</strong> and the map draws every flight and every nautical mile
-       while the calendar fills in underneath, day by day.</p>
+       while the calendar fills in underneath, day by day. The globe turns to face whatever leg is in the air, and
+       you can drag it yourself.</p>
   </div>
 
   <div class="player">
@@ -79,11 +80,18 @@
   <div class="mapwrap" id="mapwrap">
     <svg id="map" viewBox="0 0 1200 500" preserveAspectRatio="xMidYMid meet" role="img" aria-label="World map of 2026 routes">
       <defs>
+        <radialGradient id="oceanfill" cx="38%" cy="32%" r="78%">
+          <stop offset="0" stop-color="#16233f"/>
+          <stop offset="55%" stop-color="#0d1526"/>
+          <stop offset="100%" stop-color="#070b16"/>
+        </radialGradient>
         <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
           <feGaussianBlur stdDeviation="4" result="b"/>
           <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
         </filter>
       </defs>
+      <circle id="ocean" cx="600" cy="250" r="232" fill="url(#oceanfill)" stroke="rgba(120,170,255,.22)" stroke-width="1"/>
+      <g id="gGrid"></g>
       <g id="gLand"></g>
       <g id="gArcs"></g>
       <g id="gNodes"></g>
@@ -182,6 +190,6 @@
 
 <div class="tip" id="tip"></div>
 
-<script src="js/app.js?v=14"></script>
+<script src="js/app.js?v=15"></script>
 </body>
 </html>

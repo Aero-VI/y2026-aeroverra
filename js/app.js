@@ -203,10 +203,28 @@ function buildLegend(){
   tail.forEach(c=>tl.appendChild(mk(c,true)));
 }
 
-/* ---------------- the map ---------------- */
+/* ---------------- the map : ORTHOGRAPHIC GLOBE ----------------
+   Nicholas 2026-11-01: on the flat map the Pacific legs ran off the right edge
+   and reappeared on the left, which is impossible to follow. So: a real sphere.
+   Nothing wraps on a globe, and the globe turns itself to face whatever leg is
+   playing. Flat view is still there behind the FLAT button.
+---------------------------------------------------------------- */
 const MAPW = 1200, MAPH = 500, LAT_N = 84, LAT_S = -58;
-const px = (lat,lon) => [ (lon+180)/360*MAPW, (LAT_N-lat)/(LAT_N-LAT_S)*MAPH ];
 const R = Math.PI/180;
+const GL = { cx: MAPW/2, cy: MAPH/2, r: 232, lam: -40, phi: 18, mode: 'globe', spin: false };
+
+const pxFlat = (lat,lon) => [ (lon+180)/360*MAPW, (LAT_N-lat)/(LAT_N-LAT_S)*MAPH ];
+
+/* orthographic: returns [x,y,visible] */
+function pxGlobe(lat,lon){
+  const la = lat*R, lo = (lon - GL.lam)*R, p0 = GL.phi*R;
+  const cosc = Math.sin(p0)*Math.sin(la) + Math.cos(p0)*Math.cos(la)*Math.cos(lo);
+  const x = GL.cx + GL.r * Math.cos(la)*Math.sin(lo);
+  const y = GL.cy - GL.r * (Math.cos(p0)*Math.sin(la) - Math.sin(p0)*Math.cos(la)*Math.cos(lo));
+  return [x, y, cosc > 0.004];
+}
+const proj = (lat,lon) => GL.mode==='globe' ? pxGlobe(lat,lon) : [...pxFlat(lat,lon), true];
+const r1 = v => Math.round(v*10)/10;
 
 function gc(a, b, n){            /* great circle, lat/lon pairs */
   const [la1,lo1]=[a[0]*R,a[1]*R], [la2,lo2]=[b[0]*R,b[1]*R];
@@ -222,44 +240,153 @@ function gc(a, b, n){            /* great circle, lat/lon pairs */
   }
   return out;
 }
-function pathOf(a, b){            /* splits at the antimeridian */
-  const pts = gc(a,b,64).map(p=>px(p[0],p[1]));
-  let dstr='', prev=null;
-  pts.forEach(p=>{
-    if(prev && Math.abs(p[0]-prev[0]) > MAPW/2) dstr += ` M${p[0].toFixed(1)},${p[1].toFixed(1)}`;
-    else dstr += (prev?' L':'M')+p[0].toFixed(1)+','+p[1].toFixed(1);
-    prev=p;
-  });
-  return dstr;
+/* midpoint of a great circle, used to aim the globe */
+function gcMid(a,b){ const g = gc(a,b,2); return g[1] || a; }
+
+/* build a path string from lat/lon points, breaking when they go behind the
+   limb (globe) or jump the antimeridian (flat) */
+function lineOf(pts, closed){
+  let d='', pen=false, prev=null;
+  for(const pt of pts){
+    const [x,y,vis] = proj(pt[0], pt[1]);
+    if(!vis){ pen=false; prev=null; continue; }
+    if(GL.mode==='flat' && prev && Math.abs(x-prev[0]) > MAPW/2){ pen=false; }
+    d += (pen ? 'L' : 'M') + r1(x) + ',' + r1(y);
+    pen = true; prev=[x,y];
+  }
+  return d + (closed && d ? 'Z' : '');
 }
 
-let arcs = [], nodes = {}, mapReady = false;
+let arcs = [], nodes = {}, mapReady = false, LANDRINGS = [], landPaths = [], gridPaths = [];
 function drawMap(land){
-  const gL = $('#gLand'), gA = $('#gArcs'), gN = $('#gNodes');
   const NS = 'http://www.w3.org/2000/svg';
-  land.forEach(ring=>{
-    let d='';
-    ring.forEach((pt,i)=>{ const [x,y]=px(pt[1],pt[0]); d += (i?'L':'M')+x.toFixed(1)+','+y.toFixed(1); });
-    const p = document.createElementNS(NS,'path'); p.setAttribute('d', d+'Z'); gL.appendChild(p);
+  const svg = document.getElementById('map');
+  const gL = $('#gLand'), gA = $('#gArcs'), gN = $('#gNodes');
+  LANDRINGS = land.map(ring => ring.map(pt => [pt[1], pt[0]]));   // [lat,lon]
+
+  /* sphere + graticule go behind the land */
+  const gSphere = document.createElementNS(NS,'g'); gSphere.setAttribute('id','gSphere');
+  const ocean = document.createElementNS(NS,'circle');
+  ocean.setAttribute('id','ocean');
+  ocean.setAttribute('cx',GL.cx); ocean.setAttribute('cy',GL.cy); ocean.setAttribute('r',GL.r);
+  gSphere.appendChild(ocean);
+  const gGrid = document.createElementNS(NS,'g'); gGrid.setAttribute('id','gGrid');
+  for(let lon=-180; lon<180; lon+=30){
+    const p = document.createElementNS(NS,'path'); p.setAttribute('class','grat');
+    gGrid.appendChild(p);
+    gridPaths.push({el:p, pts: Array.from({length:37},(_,i)=>[-90+i*5, lon])});
+  }
+  for(let lat=-60; lat<=60; lat+=30){
+    const p = document.createElementNS(NS,'path'); p.setAttribute('class','grat');
+    gGrid.appendChild(p);
+    gridPaths.push({el:p, pts: Array.from({length:73},(_,i)=>[lat, -180+i*5])});
+  }
+  svg.insertBefore(gSphere, gL);
+  svg.insertBefore(gGrid, gL);
+
+  LANDRINGS.forEach(()=>{
+    const p = document.createElementNS(NS,'path'); gL.appendChild(p); landPaths.push(p);
   });
 
-  D.moves.forEach((m,i)=>{
+  D.moves.forEach(m=>{
     const p = document.createElementNS(NS,'path');
-    p.setAttribute('d', pathOf(m.a, m.b));
     p.setAttribute('class','arc '+m.t);
     gA.appendChild(p);
-    arcs.push({el:p, m, len:0});
+    arcs.push({el:p, m, pts: gc(m.a, m.b, 64)});
     [[m.a,m.al],[m.b,m.bl]].forEach(([c,lbl])=>{
       const k = c[0].toFixed(2)+','+c[1].toFixed(2);
       if(nodes[k]) return;
-      const [x,y]=px(c[0],c[1]);
       const ci = document.createElementNS(NS,'circle');
-      ci.setAttribute('cx',x); ci.setAttribute('cy',y); ci.setAttribute('r',2.2);
-      ci.setAttribute('class','nd'); gN.appendChild(ci);
-      nodes[k] = {el:ci, x, y, lbl};
+      ci.setAttribute('r',2.2); ci.setAttribute('class','nd'); gN.appendChild(ci);
+      nodes[k] = {el:ci, x:0, y:0, lbl, c};
     });
   });
   mapReady = true;
+  renderMap();
+  mapControls();
+}
+
+function renderMap(){
+  const globe = GL.mode==='globe';
+  document.getElementById('ocean').style.display = globe ? '' : 'none';
+  document.getElementById('gGrid').style.display = globe ? '' : 'none';
+  gridPaths.forEach(g => g.el.setAttribute('d', lineOf(g.pts,false)));
+  LANDRINGS.forEach((ring,i) => landPaths[i].setAttribute('d', lineOf(ring,true)));
+  arcs.forEach(a => a.el.setAttribute('d', lineOf(a.pts,false)));
+  for(const k in nodes){
+    const n = nodes[k];
+    const [x,y,vis] = proj(n.c[0], n.c[1]);
+    n.x=x; n.y=y;
+    n.el.setAttribute('cx',r1(x)); n.el.setAttribute('cy',r1(y));
+    n.el.style.display = vis ? '' : 'none';
+  }
+}
+
+/* --- turn the globe, smoothly --- */
+let spinRAF = 0, tween = null;
+function aimAt(lat,lon,ms=1100){
+  if(GL.mode!=='globe' || REDUCED){ return; }
+  let d = ((lon - GL.lam + 540) % 360) - 180;          // shortest way round
+  tween = { l0:GL.lam, p0:GL.phi, dl:d, dp:(Math.max(-55,Math.min(55,lat*0.75)) - GL.phi), t0:performance.now(), ms };
+  runTween();
+}
+function runTween(){
+  cancelAnimationFrame(spinRAF);
+  const loop = t => {
+    let busy = false;
+    if(tween){
+      const f = Math.min(1,(t-tween.t0)/tween.ms);
+      const e = f<.5 ? 2*f*f : 1-Math.pow(-2*f+2,2)/2;
+      GL.lam = tween.l0 + tween.dl*e;
+      GL.phi = tween.p0 + tween.dp*e;
+      if(f>=1) tween=null; else busy = true;
+    }
+    if(GL.spin && !tween){ GL.lam = (GL.lam + 0.12 + 540)%360 - 180; busy = true; }
+    renderMap();
+    if(busy) spinRAF = requestAnimationFrame(loop);
+  };
+  spinRAF = requestAnimationFrame(loop);
+}
+
+function mapControls(){
+  const lg = document.querySelector('.maplegend');
+  if(!lg || document.getElementById('mapBtns')) return;
+  const box = el('span','mapbtns');
+  box.id = 'mapBtns';
+  const mk = (label,title,on,fn)=>{
+    const b = document.createElement('button');
+    b.textContent = label; b.title = title; b.className = 'mb' + (on?' on':'');
+    b.addEventListener('click',()=>{ fn(b); });
+    box.appendChild(b); return b;
+  };
+  const bG = mk('GLOBE','Orthographic globe. Nothing wraps off the edge.', true, b=>{
+    GL.mode = GL.mode==='globe' ? 'flat' : 'globe';
+    b.textContent = GL.mode==='globe' ? 'GLOBE' : 'FLAT';
+    b.classList.toggle('on', GL.mode==='globe');
+    renderMap();
+  });
+  mk('SPIN','Idle rotation', false, b=>{
+    GL.spin = !GL.spin; b.classList.toggle('on', GL.spin);
+    if(GL.spin) runTween();
+  });
+  lg.appendChild(box);
+
+  /* drag to rotate */
+  const svg = document.getElementById('map');
+  let drag = null;
+  const down = e => { if(GL.mode!=='globe') return; drag = {x:(e.touches?e.touches[0]:e).clientX, y:(e.touches?e.touches[0]:e).clientY, lam:GL.lam, phi:GL.phi}; svg.classList.add('grabbing'); };
+  const move = e => {
+    if(!drag) return;
+    const t = e.touches?e.touches[0]:e;
+    const k = 0.32 * (MAPW / svg.getBoundingClientRect().width);
+    GL.lam = ((drag.lam - (t.clientX-drag.x)*k) + 540)%360 - 180;
+    GL.phi = Math.max(-78, Math.min(78, drag.phi + (t.clientY-drag.y)*k));
+    tween = null; renderMap();
+    if(e.cancelable) e.preventDefault();
+  };
+  const up = () => { drag=null; svg.classList.remove('grabbing'); };
+  svg.addEventListener('mousedown',down); addEventListener('mousemove',move); addEventListener('mouseup',up);
+  svg.addEventListener('touchstart',down,{passive:true}); svg.addEventListener('touchmove',move,{passive:false}); addEventListener('touchend',up);
 }
 
 function ping(x,y){
@@ -274,14 +401,15 @@ function ping(x,y){
 function comet(path){
   if(REDUCED) return;
   const NS='http://www.w3.org/2000/svg';
-  const len = path.getTotalLength(); if(!len) return;
+  let len = 0; try{ len = path.getTotalLength(); }catch(e){}
+  if(!len) return;
   const c = document.createElementNS(NS,'circle');
   c.setAttribute('r',2.6); c.setAttribute('class','comet');
   $('#gLive').appendChild(c);
-  const t0 = performance.now(), dur = 850;
+  const t0 = performance.now(), dur = 900;
   const step = t => {
     const f = Math.min(1,(t-t0)/dur);
-    const p = path.getPointAtLength(len*f);
+    let p; try{ p = path.getPointAtLength(path.getTotalLength()*f); }catch(e){ c.remove(); return; }
     c.setAttribute('cx',p.x); c.setAttribute('cy',p.y);
     c.setAttribute('opacity', 1-f*0.7);
     if(f<1) requestAnimationFrame(step); else c.remove();
@@ -300,7 +428,9 @@ function syncMap(idx, animate){
       a.el.classList.toggle('on', on);
       if(on && animate){
         a.el.classList.add('hot'); setTimeout(()=>a.el.classList.remove('hot'), 1400);
-        comet(a.el);
+        const mid = gcMid(a.m.a, a.m.b);
+        aimAt(mid[0], mid[1], 900);
+        setTimeout(()=>comet(a.el), 520);
         const k = a.m.b[0].toFixed(2)+','+a.m.b[1].toFixed(2);
         if(nodes[k]) ping(nodes[k].x, nodes[k].y);
       }

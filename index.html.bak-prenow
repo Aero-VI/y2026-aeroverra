@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>2026 Wrapped · Nicholas Halka</title>
+<meta name="description" content="2026 so far: 26 countries, 86,867 miles, 149 hours in the air, 73 nights at sea. The year in numbers.">
+<meta property="og:title" content="2026 Wrapped · Nicholas Halka">
+<meta property="og:description" content="26 countries. 86,867 miles. 149 hours in the air. 73 nights at sea. 68 cities slept in. Scroll it.">
+<meta property="og:type" content="website">
+<link rel="stylesheet" href="css/wrapped.css?v=3">
+</head>
+<body>
+
+<div class="bgfx"><i></i><i></i><i></i></div>
+<nav class="dots" id="dots"></nav>
+<div class="prog"><i id="progBar"></i></div>
+
+<main id="deck">
+
+  <!-- 1 -->
+  <section class="slide s-open" data-k="open">
+    <div class="in">
+      <div class="eyebrow">Nicholas Halka · @nnickkh</div>
+      <h1 class="year"><span>2</span><span>0</span><span>2</span><span>6</span></h1>
+      <div class="wrapword">WRAPPED</div>
+      <p class="lede">305 days in. 60 still to go. Here is what the year looks like
+         when you add it all up from the actual bookings.</p>
+      <div class="cue">scroll <b>↓</b></div>
+    </div>
+  </section>
+
+  <!-- 2 -->
+  <section class="slide" data-k="split">
+    <div class="in">
+      <div class="label">The shape of it</div>
+      <h2>He was in <em>26 countries</em> this year.</h2>
+      <div class="splitbars">
+        <div class="sb" style="--c:#ff3864"><div class="sbar"><i data-w="56"></i></div>
+          <div class="sv"><b data-n="170">0</b> days abroad</div></div>
+        <div class="sb" style="--c:#3b6dff"><div class="sbar"><i data-w="33"></i></div>
+          <div class="sv"><b data-n="101">0</b> days in the US</div></div>
+        <div class="sb" style="--c:#14cfe0"><div class="sbar"><i data-w="11"></i></div>
+          <div class="sv"><b data-n="33">0</b> days in no country at all</div></div>
+      </div>
+      <p class="note">304 of 305 days are backed by a real booking. One day is missing: 15 January,
+         somewhere over the Pacific, a day he technically skipped.</p>
+    </div>
+  </section>
+
+  <!-- 3 -->
+  <section class="slide" data-k="flags">
+    <div class="in">
+      <div class="label">The passport</div>
+      <h2><em>16</em> of those 26 were brand new.</h2>
+      <div class="flagwall" id="flagwall"></div>
+      <p class="note">Gold means he had never set foot there before 2026.</p>
+    </div>
+  </section>
+
+  <!-- 4 -->
+  <section class="slide" data-k="podium">
+    <div class="in">
+      <div class="label">Where he actually stayed</div>
+      <h2>Japan was not close.</h2>
+      <div class="podium" id="podium"></div>
+      <p class="note">Days outside the United States. Japan took 76% of the days of his
+         biggest non-US country. Nothing else came near.</p>
+    </div>
+  </section>
+
+  <!-- 5 -->
+  <section class="slide" data-k="miles">
+    <div class="in">
+      <div class="label">Distance travelled</div>
+      <div class="hugenum"><b data-n="86867">0</b><span>miles</span></div>
+      <div class="milesplit">
+        <div><b data-n="63396">0</b><span>by air</span></div>
+        <div><b data-n="21210">0</b><span>by sea</span></div>
+        <div><b data-n="2261">0</b><span>by rail and road</span></div>
+      </div>
+      <div class="moon">
+        <div class="moonrow"><span>Laps of the equator</span><b>3.49×</b></div>
+        <div class="track"><i data-w="100" class="full"></i></div>
+        <div class="moonrow"><span>Of the way to the moon</span><b>36.4%</b></div>
+        <div class="track"><i data-w="36.4"></i><em>🌕</em></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6 -->
+  <section class="slide" data-k="air">
+    <div class="in">
+      <div class="label">In the air</div>
+      <h2><em data-n="149">0</em> hours airborne.</h2>
+      <p class="sub">That is 6.2 solid days strapped into a seat, across <b>39 flights</b>,
+         <b>32 airports</b> and <b>17 airlines</b>. A flight every 7.8 days, all year.</p>
+      <div class="grid3" id="airgrid"></div>
+    </div>
+  </section>
+
+  <!-- 7 -->
+  <section class="slide" data-k="bigday">
+    <div class="in">
+      <div class="label">The single biggest day</div>
+      <h2>14 January: <em data-n="9424">0</em> miles before bed.</h2>
+      <div class="legs" id="legs"></div>
+      <p class="note">Myrtle Beach to Brisbane the hard way, in one go, finishing with a
+         14 and a half hour redeye across the Pacific. He did five redeyes this year.</p>
+    </div>
+  </section>
+
+  <!-- 8 -->
+  <section class="slide" data-k="sea">
+    <div class="in">
+      <div class="label">At sea</div>
+      <h2><em data-n="73">0</em> nights on a moving hotel.</h2>
+      <p class="sub"><b>7 ships</b>, <b>33 port calls</b>, <b>31 different ports</b>.
+         One in every four nights of 2026 was spent aboard something.</p>
+      <div class="shipline" id="shipline"></div>
+      <p class="note">The longest was Carnival Freedom, 14 nights, Cape Canaveral to Barcelona.</p>
+    </div>
+  </section>
+
+  <!-- 9 -->
+  <section class="slide" data-k="beds">
+    <div class="in">
+      <div class="label">Where he slept</div>
+      <h2><em data-n="68">0</em> cities. <em data-n="41">0</em> hotels.</h2>
+      <div class="bedgrid">
+        <div class="bcard"><b data-n="122">0</b><span>hotel nights</span></div>
+        <div class="bcard"><b data-n="73">0</b><span>cruise nights</span></div>
+        <div class="bcard"><b data-n="47">0</b><span>nights at home</span></div>
+        <div class="bcard"><b>3.0</b><span>average nights per stay</span></div>
+      </div>
+      <p class="note">Longest single stay all year: 16 nights at one hotel in Akihabara, Tokyo.
+         He spent more nights on ships than in his own bed.</p>
+    </div>
+  </section>
+
+  <!-- 10 -->
+  <section class="slide" data-k="whip">
+    <div class="in">
+      <div class="label">Whiplash</div>
+      <h2><em data-n="29">0</em> times the country under his feet changed.</h2>
+      <div class="whipwrap">
+        <div class="wcard"><b data-n="12">0</b><span>days that started in one country and ended in another</span></div>
+        <div class="wcard hot"><b data-n="3">0</b><span>days that touched three countries</span></div>
+      </div>
+      <div class="chain" id="chain"></div>
+      <p class="note">22 February: Singapore for breakfast, Tokyo by morning, American soil by night.</p>
+    </div>
+  </section>
+
+  <!-- 11 -->
+  <section class="slide" data-k="corners">
+    <div class="in">
+      <div class="label">The corners</div>
+      <h2><em>94°</em> of latitude, pole to pole-ish.</h2>
+      <div class="compass">
+        <div class="cp n"><span>NORTH</span><b>Helsinki</b><s>60.17°</s></div>
+        <div class="cp w"><span>WEST</span><b>Honolulu</b><s>157.93°W</s></div>
+        <div class="cp e"><span>EAST</span><b>Brisbane</b><s>153.17°E</s></div>
+        <div class="cp s"><span>SOUTH</span><b>Sydney</b><s>33.94°S</s></div>
+        <div class="cmid"><b>2</b><span>equator crossings</span><b>3</b><span>dateline crossings</span></div>
+      </div>
+      <p class="note">He also went 61 straight days without touching American soil, 3 March to 2 May.</p>
+    </div>
+  </section>
+
+  <!-- 12 -->
+  <section class="slide" data-k="week">
+    <div class="in">
+      <div class="label">The busiest seven days of the year</div>
+      <h2>14 to 20 June: <em>six</em> countries.</h2>
+      <div class="weekflags" id="weekflags"></div>
+      <p class="note">Finland, Estonia, Latvia, Poland, Denmark, the UK. One week. That was the Baltic
+         run on Sapphire Princess, and it is the densest the calendar ever got.</p>
+    </div>
+  </section>
+
+  <!-- 13 -->
+  <section class="slide s-end" data-k="end">
+    <div class="in">
+      <div class="label">And it is not finished</div>
+      <h1 class="year small"><span>6</span><span>0</span></h1>
+      <p class="lede">days left in 2026, with Zimbabwe, Botswana and a move to Spain still on the books.</p>
+      <a class="cta" href="explore.html">Explore every single day →</a>
+      <p class="note tiny">Built by Azula from the trip database behind travel.aeroverra.com.
+         Flight confirmations, hotel bookings and cruise manifests, not vibes.
+         Distances are great-circle between real booked points.</p>
+    </div>
+  </section>
+
+</main>
+
+<script src="js/wrapped.js?v=3"></script>
+</body>
+</html>

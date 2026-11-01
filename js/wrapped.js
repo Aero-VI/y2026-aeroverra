@@ -9,10 +9,15 @@ const HUE = { open:['#3b6dff','#ff3864','#14cfe0'], split:['#ff3864','#3b6dff','
   bigday:['#ff3864','#ffc234','#a855f7'], sea:['#14cfe0','#3b6dff','#22c55e'],
   beds:['#22c55e','#14cfe0','#3b6dff'], whip:['#ff3864','#a855f7','#ffc234'],
   corners:['#3b6dff','#14cfe0','#ffc234'], week:['#a855f7','#ff3864','#14cfe0'],
+  now:['#14cfe0','#3b6dff','#22c55e'],
   end:['#3b6dff','#a855f7','#ff3864'] };
 
-fetch('data/wrapped2026.json?v=3').then(r=>r.json()).then(W=>{
+Promise.all([
+  fetch('data/wrapped2026.json?v=4').then(r=>r.json()),
+  fetch('data/next.json?v=4').then(r=>r.json()).catch(()=>null)
+]).then(([W, N])=>{
   buildFlags(W); buildPodium(W); buildAir(W); buildLegs(W); buildShips(W); buildChain(W); buildWeek(W);
+  if(N) buildNow(N);
   buildDots(); observe(); progress();
 });
 
@@ -150,4 +155,51 @@ function progress(){
     bar.style.width = (h>0 ? scrollY/h*100 : 0)+'%';
   };
   addEventListener('scroll', run, {passive:true}); run();
+}
+
+/* ---------- here now / here next ---------- */
+const FLAG = cc => cc && cc.length===2
+  ? cc.toUpperCase().replace(/./g,c=>String.fromCodePoint(0x1F1E6+c.charCodeAt(0)-65)) : '\ud83d\uddd3\ufe0f';
+const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const dOf = s => new Date(s+'T12:00:00Z');
+const shortD = s => dOf(s).getUTCDate()+' '+MON[dOf(s).getUTCMonth()];
+const diffD = (a,b) => Math.round((dOf(b)-dOf(a))/864e5);
+
+function buildNow(N){
+  const today = new Date().toISOString().slice(0,10);
+  const box = $('#nowBox');
+  if(box && N.now){
+    const n = N.now, days = Math.max(1, diffD(n.since, today) + 1);
+    box.innerHTML =
+      `<div class="nf">${FLAG(n.cc)}</div>
+       <div class="nb">
+         <div class="tag"><i></i>here now</div>
+         <div class="ct">${n.city}${n.country ? ', '+n.country : ''}</div>
+         <div class="nl">${n.line || ''}</div>
+       </div>
+       <div class="nd"><b data-n="${days}">0</b><s>${days===1?'day':'days'} in</s><s>${n.country||n.cc}</s></div>`;
+  }
+  const list = $('#nextList');
+  if(!list) return;
+  const up = (N.next||[]).filter(x => (x.to || x.from) >= today).slice(0,5);
+  if(!up.length){
+    list.innerHTML = '<div class="nx planned"><div class="k">next</div><div class="e">\ud83d\udd73\ufe0f</div>'+
+      '<div class="p">Nothing booked</div><div class="l">The calendar past today is empty. That never lasts.</div></div>';
+    return;
+  }
+  up.forEach((x,i)=>{
+    const away = Math.max(0, diffD(today, x.from));
+    const span = diffD(x.from, x.to) + 1;
+    const booked = (x.status||'').toLowerCase() === 'booked' || (x.status||'').toLowerCase() === 'confirmed';
+    const c = el('div','nx'+(booked?'':' planned'));
+    c.innerHTML =
+      `<div class="k">${i===0?'up next':'then'}</div>
+       <div class="away">${away===0?'today':away+'d'}</div>
+       <div class="e">${FLAG(x.cc)}</div>
+       <div class="p">${x.city || x.country}</div>
+       <div class="w">${x.from===x.to ? shortD(x.from) : shortD(x.from)+' \u2192 '+shortD(x.to)+' \u00b7 '+span+'d'}</div>
+       <div class="l">${x.line||''}</div>`;
+    c.style.animationDelay = (i*90)+'ms';
+    list.appendChild(c);
+  });
 }
