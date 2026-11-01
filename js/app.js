@@ -23,11 +23,11 @@ function hsl(cc){ let h=0; for(const ch of cc) h=(h*31+ch.charCodeAt(0))%360; re
 const dObj = s => new Date(s+'T12:00:00Z');
 const pretty = s => { const d=dObj(s); return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getUTCDay()]+' '+d.getUTCDate()+' '+MONTHSL[d.getUTCMonth()]; };
 
-fetch('data/year2026.json?v=5').then(r=>r.json()).then(data=>{
+fetch('data/year2026.json?v=6').then(r=>r.json()).then(data=>{
   D = data;
   D.countries.forEach(c => META[c.cc] = c);
   D.days.forEach(d => byDate[d.d] = d);
-  heroStats(); buildRibbon(); buildLegend(); buildBoard('all'); buildMonths(); buildCards(); buildShips();
+  heroStats(); buildRibbon(); buildLegend(); buildBoard('all'); buildMonths(); buildCards(); buildStreaks(); buildShips();
   $('#genline').textContent = 'Data current to 1 November 2026.';
   wire();
 });
@@ -92,13 +92,18 @@ function buildRibbon(){
     mr.appendChild(el('div','', m!==undefined ? MONTHS[m] : ''));
   }
   $('#scrub').max = D.days.length-1;
+  const ti = D.days.findIndex(x=>x.d===D.today);
+  if(ti>=0){ setReadout(ti,true); $('#scrub').value = ti; }
 }
 
 function setReadout(idx, lock){
   const d = D.days[idx];
   const cc = d.ccs[0];
   const m = META[cc] || {flag:'🗓️', name:'Unlogged'};
-  $('#roFlag').textContent = d.future ? '🔮' : m.flag;
+  const fe = $('#roFlag');
+  const nf = d.future ? '🔮' : m.flag;
+  if(fe.textContent !== nf){ fe.classList.remove('pop'); void fe.offsetWidth; fe.classList.add('pop'); }
+  fe.textContent = nf;
   $('#roDate').textContent = pretty(d.d) + (d.future ? ' · still to come' : '');
   $('#roCountry').textContent = d.ccs.length>1
       ? d.ccs.map(c=>(META[c]||{name:c}).name).join('  →  ')
@@ -241,6 +246,24 @@ function buildCards(){
   add(`<h3>The split</h3><div class="big">${s.days_us} / ${s.days_abroad}</div>
        <div class="sub">days in the United States versus days on foreign soil. ${s.days_untracked===0?'Every day':(304)+' of 305 days'}
        is accounted for by a booking.</div>`);
+}
+
+/* ---------------- streaks ---------------- */
+function buildStreaks(){
+  const box = $('#streaks'); if(!box) return;
+  const multi = D.days.filter(d=>!d.future && d.ccs.length>1).length;
+  const hop = D.days.filter(d=>!d.future && d.ccs.length>2).length;
+  const items = D.stats.longest_runs.slice(0,3).map(r=>
+    ({f:r.flag, n:r.n, w:'day run', d:r.name+', from '+pretty(r.start), c:col(r.cc)}));
+  items.push({f:'🛬', n:multi, w:'two-country days', d:'days that started in one country and ended in another', c:'#19d2e6'});
+  items.push({f:'🤯', n:hop, w:'three-country days', d:'airport, airport, hotel, all before midnight', c:'#ff4d6d'});
+  items.push({f:'🧭', n:D.stats.switches, w:'border hops', d:'times the country under his feet changed', c:'#ffc234'});
+  items.forEach(it=>{
+    const s = el('div','stk');
+    s.innerHTML = `<i class="glow" style="background:${it.c}"></i><div class="f">${it.f}</div>
+      <div class="n">${it.n}</div><div class="w">${it.w}</div><div class="d">${it.d}</div>`;
+    box.appendChild(s);
+  });
 }
 
 /* ---------------- ships ---------------- */
