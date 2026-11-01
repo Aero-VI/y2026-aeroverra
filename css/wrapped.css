@@ -37,10 +37,10 @@ a{color:var(--c1)}
 }
 #deck::-webkit-scrollbar{display:none}
 .scene{
-  position:relative; min-height:100dvh; scroll-snap-align:start;
+  position:relative; min-height:100dvh; max-height:100dvh; scroll-snap-align:start;
   display:grid; place-items:center; padding:clamp(18px,4vw,54px); overflow:hidden;
 }
-.wrap{width:var(--sw); margin:auto; position:relative; z-index:2}
+.wrap{width:var(--sw); margin:auto; position:relative; z-index:2; max-height:100%; overflow:visible}
 
 /* ---------- ambient background ---------- */
 .glows{position:fixed;inset:0;z-index:0;pointer-events:none;filter:blur(70px);opacity:.5}
@@ -66,15 +66,15 @@ canvas#fx{position:fixed;inset:0;z-index:0;pointer-events:none}
 .kick b{color:var(--c4);font-weight:800}
 h2.big{
   margin:0; font-weight:900; letter-spacing:-.045em; line-height:.86;
-  font-size:clamp(44px,10.2vw,150px);
+  font-size:clamp(40px,min(10.2vw,13vh),150px);
 }
-h2.big.sm{font-size:clamp(32px,6.4vw,92px)}
+h2.big.sm{font-size:clamp(30px,min(6.4vw,8.4vh),92px)}
 .grad{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent;
   background-size:220% 100%;animation:slide 9s linear infinite}
 @keyframes slide{to{background-position:220% 0}}
 .lede{
   margin:clamp(16px,2.6vh,28px) 0 0; max-width:30ch;
-  font-size:clamp(16px,2.05vw,27px); line-height:1.42; color:#d7dcf5; font-weight:450;
+  font-size:clamp(15px,min(2.05vw,2.6vh),27px); line-height:1.4; color:#d7dcf5; font-weight:450;
 }
 .lede.wide{max-width:46ch}
 .lede b{color:#fff;font-weight:750}
@@ -83,9 +83,9 @@ h2.big.sm{font-size:clamp(32px,6.4vw,92px)}
 /* huge number */
 .num{
   font-weight:900; letter-spacing:-.05em; line-height:.8; font-variant-numeric:tabular-nums;
-  font-size:clamp(76px,21vw,320px); display:block;
+  font-size:clamp(66px,min(21vw,26vh),320px); display:block;
 }
-.num.s2{font-size:clamp(60px,13vw,190px)}
+.num.s2{font-size:clamp(52px,min(13vw,17vh),190px)}
 .unit{font-weight:800;letter-spacing:-.02em;font-size:clamp(18px,3vw,44px);color:var(--dim)}
 
 /* ---------- reveal mechanics ---------- */
@@ -100,7 +100,7 @@ h2.big.sm{font-size:clamp(32px,6.4vw,92px)}
 .cover{text-align:center}
 .yr{display:flex;justify-content:center;gap:clamp(2px,.6vw,10px);line-height:.78;margin:0}
 .yr span{
-  font-weight:900;font-size:clamp(84px,25vw,340px);letter-spacing:-.06em;
+  font-weight:900;font-size:clamp(76px,min(25vw,30vh),340px);letter-spacing:-.06em;
   background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent;
   background-size:300% 100%;
   opacity:0;transform:translateY(.42em) scale(.86);filter:blur(16px);
@@ -133,9 +133,9 @@ h2.big.sm{font-size:clamp(32px,6.4vw,92px)}
 .btn.ghost:hover{border-color:rgba(255,255,255,.4)}
 
 /* ---------- flag storm ---------- */
-.storm{display:flex;flex-wrap:wrap;gap:clamp(6px,1vw,14px);margin-top:clamp(18px,3vh,30px);max-width:100%}
+.storm{display:flex;flex-wrap:wrap;gap:clamp(5px,.9vw,13px);margin-top:clamp(14px,2.4vh,26px);max-width:100%}
 .fl{
-  font-size:clamp(26px,4.4vw,58px);line-height:1;filter:drop-shadow(0 6px 18px rgba(0,0,0,.5));
+  font-size:clamp(20px,min(4.4vw,5.4vh),58px);line-height:1;filter:drop-shadow(0 6px 18px rgba(0,0,0,.5));
   opacity:0;transform:translateY(18px) scale(.6) rotate(-10deg)
 }
 .in .fl{animation:flin .6s cubic-bezier(.2,1.5,.3,1) forwards}
