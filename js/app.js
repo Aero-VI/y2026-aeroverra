@@ -357,13 +357,22 @@ function fitMap(){
     const pad = 26 / GL.z;
     const half = GL.r + pad, d = half*2;
     svg.setAttribute('viewBox', `${GL.cx-half} ${GL.cy-half} ${d} ${d}`);
+    /* size by HEIGHT so the square never overflows its box */
+    const narrow = innerWidth < 760;
+    const h = narrow ? Math.min(innerWidth - 24, innerHeight * .62) : Math.min(innerHeight * .74, 720);
     svg.style.aspectRatio = '1 / 1';
-    svg.style.maxHeight = (innerWidth < 760 ? '92vw' : '74vh');
+    svg.style.width = 'auto';
+    svg.style.height = h + 'px';
+    svg.style.maxWidth = '100%';
     svg.style.margin = '0 auto';
+    svg.style.display = 'block';
+    const box = svg.parentElement;
+    if(box){ box.style.height='auto'; box.style.display='flex'; box.style.justifyContent='center'; box.style.alignItems='center'; }
   } else {
     svg.setAttribute('viewBox', `0 0 ${MAPW} ${MAPH}`);
-    svg.style.aspectRatio = '';
-    svg.style.maxHeight = '';
+    svg.style.aspectRatio = ''; svg.style.width='100%'; svg.style.height='auto'; svg.style.maxWidth='';
+    const box = svg.parentElement;
+    if(box){ box.style.height=''; box.style.display=''; }
   }
 }
 
