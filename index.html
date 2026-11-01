@@ -8,8 +8,7 @@
 <meta property="og:title" content="2026 — The Year in Motion">
 <meta property="og:description" content="26 countries. 304 tracked days. 39 flights. 73 nights at sea. Every single day of 2026, coloured by where he woke up.">
 <meta property="og:type" content="website">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="css/style.css?v=7">
+<link rel="stylesheet" href="css/style.css?v=12">
 </head>
 <body>
 
@@ -27,44 +26,73 @@
 
 <main>
 
-<!-- ============ THE RIBBON ============ -->
-<section class="sec" id="ribbon-sec">
+<!-- ============ THE ENGINE: map + ribbon on one timeline ============ -->
+<section class="sec reveal" id="motion-sec">
   <div class="sec-head">
-    <h2>The Ribbon</h2>
-    <p>One tile per day. <strong>Hover</strong> any day to see where he was. <strong>Press play</strong> to watch the year happen.</p>
+    <h2>The Year in Motion</h2>
+    <p>One timeline, two views. <strong>Press play</strong> and the map draws every flight and every nautical mile
+       while the calendar fills in underneath, day by day.</p>
   </div>
 
   <div class="player">
     <button id="playBtn" class="play">▶<span>Play the year</span></button>
-    <input type="range" id="scrub" min="0" max="364" value="0">
+    <input type="range" id="scrub" min="0" max="364" value="0" aria-label="Scrub through 2026">
     <div class="speed">
-      <button data-sp="60" class="sp">1×</button>
-      <button data-sp="28" class="sp on">2×</button>
-      <button data-sp="12" class="sp">5×</button>
+      <button data-sp="70" class="sp">1×</button>
+      <button data-sp="32" class="sp on">2×</button>
+      <button data-sp="13" class="sp">5×</button>
     </div>
   </div>
 
   <div class="readout" id="readout">
     <div class="ro-flag" id="roFlag">🗓️</div>
     <div class="ro-body">
-      <div class="ro-date" id="roDate">Hover a day, or hit play</div>
+      <div class="ro-date" id="roDate">Tap a day, or hit play</div>
       <div class="ro-country" id="roCountry">2026</div>
       <div class="ro-label" id="roLabel">304 of 305 days accounted for</div>
     </div>
     <div class="ro-count" id="roCount"></div>
   </div>
 
-  <div class="ribbon-wrap">
+  <!-- ---- MAP ---- -->
+  <div class="mapwrap" id="mapwrap">
+    <svg id="map" viewBox="0 0 1200 500" preserveAspectRatio="xMidYMid meet" role="img" aria-label="World map of 2026 routes">
+      <defs>
+        <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+          <feGaussianBlur stdDeviation="4" result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>
+      <g id="gLand"></g>
+      <g id="gArcs"></g>
+      <g id="gNodes"></g>
+      <g id="gLive"></g>
+    </svg>
+    <div class="maplegend">
+      <span><i class="k f"></i>flights <b id="nFl">0</b></span>
+      <span><i class="k c"></i>sea legs <b id="nCr">0</b></span>
+      <span><i class="k r"></i>rail &amp; road <b id="nRl">0</b></span>
+      <span class="mapnow" id="mapNow"></span>
+    </div>
+  </div>
+
+  <!-- ---- RIBBON ---- -->
+  <div class="ribbon-head">
+    <h3>Every day, as a tile</h3>
+    <div class="ribhint" id="ribHint">Tap any day for the detail</div>
+  </div>
+  <div class="ribbon-wrap" id="ribbonWrap">
     <div class="monthrow" id="monthRow"></div>
     <div class="ribbon" id="ribbon"></div>
   </div>
 
   <div class="legend" id="legend"></div>
-  <div class="hint">Click a country chip to isolate its days. Click again to release.</div>
+  <div class="legend tail" id="legendTail"></div>
+  <div class="hint">Tap a country chip to isolate its days. Tap again to release.</div>
 </section>
 
 <!-- ============ LEADERBOARD ============ -->
-<section class="sec" id="board-sec">
+<section class="sec reveal" id="board-sec">
   <div class="sec-head">
     <h2>Days per country</h2>
     <p>A day counts if he set foot in that country at any point, so travel days can land in two places at once.</p>
@@ -75,19 +103,23 @@
     <button class="tg" data-mode="land">Land only (no sea days)</button>
   </div>
   <div class="board" id="board"></div>
+  <div class="tailwrap">
+    <div class="tailhead" id="tailHead">The one and two day countries</div>
+    <div class="tailchips" id="tailChips"></div>
+  </div>
 </section>
 
 <!-- ============ MONTH RAIL ============ -->
-<section class="sec" id="months-sec">
+<section class="sec reveal" id="months-sec">
   <div class="sec-head">
     <h2>Twelve months, twelve moods</h2>
-    <p>How many different countries he touched in each month of 2026.</p>
+    <p>How many different countries he touched in each month of 2026. Tap a month to jump the timeline there.</p>
   </div>
   <div class="mrail" id="mrail"></div>
 </section>
 
 <!-- ============ STREAKS ============ -->
-<section class="sec" id="streak-sec">
+<section class="sec reveal" id="streak-sec">
   <div class="sec-head">
     <h2>Streaks and whiplash</h2>
     <p>The longest he stood still, and the days he did not.</p>
@@ -96,7 +128,7 @@
 </section>
 
 <!-- ============ NUMBERS ============ -->
-<section class="sec" id="cards-sec">
+<section class="sec reveal" id="cards-sec">
   <div class="sec-head">
     <h2>The receipts</h2>
     <p>Pulled from flight confirmations, hotel bookings and cruise manifests, not vibes.</p>
@@ -105,7 +137,7 @@
 </section>
 
 <!-- ============ CRUISES ============ -->
-<section class="sec" id="cruise-sec">
+<section class="sec reveal" id="cruise-sec">
   <div class="sec-head">
     <h2>Seven ships</h2>
     <p>73 nights of 2026 were spent on a moving hotel.</p>
@@ -121,13 +153,14 @@
     <a href="https://travel.aeroverra.com">travel.aeroverra.com</a>: flight departure and arrival dates, hotel
     check-in through check-out, cruise embark, port calls and disembark. Days with no booking either side are only
     filled in when the bookings before and after agree on the country. Sea days belong to no country and are counted
-    on their own. <span id="genline"></span>
+    on their own. Territories are counted as their own entry, same as any country. Map routes are great circles
+    between real booked ports and airports, not recorded tracks. <span id="genline"></span>
   </div>
   <div class="fin small">Built by Azula.</div>
 </footer>
 
 <div class="tip" id="tip"></div>
 
-<script src="js/app.js?v=7"></script>
+<script src="js/app.js?v=12"></script>
 </body>
 </html>
