@@ -647,7 +647,17 @@ function ping(x,y){
 /* a plane for flights, a ship for cruises, a train for rail — not a dot
    (Nicholas 2026-11-01) */
 const GLYPH = { f:'\u2708', c:'\uD83D\uDEF3', r:'\uD83D\uDE86', b:'\uD83D\uDE8C' };
-function comet(path, type){
+/* How long a leg takes to cross the screen. A 300-mile hop should snap; a
+   Pacific crossing should take its time. Length-scaled instead of a flat 1.5s
+   for everything, and it rides the playback speed. (Nicholas 2026-11-02) */
+function legMs(deg){
+  const base = 620 + Math.pow(Math.max(0,deg), 0.85) * 62;   // 5deg~0.9s, 60deg~2.7s, 160deg~5.2s
+  const scale = PLAYING ? Math.max(0.5, Math.min(1.6, speed/70)) : 1;
+  return Math.round(Math.max(600, Math.min(5200, base)) * scale);
+}
+let animSeq = 0;
+/* The glyph flies AND the line draws itself behind it, over the same clock. */
+function comet(path, type, dur){
   if(REDUCED) return;
   const NS='http://www.w3.org/2000/svg';
   let len = 0; try{ len = path.getTotalLength(); }catch(e){}
@@ -656,21 +666,30 @@ function comet(path, type){
   g.setAttribute('class','vehicle v-'+(type||'f'));
   g.textContent = GLYPH[type] || GLYPH.f;
   $('#gLive').appendChild(g);
-  const t0 = performance.now(), dur = 1500;
+  const mine = ++animSeq;
+  path.dataset.anim = mine;
+  const clear = () => { if(+path.dataset.anim === mine){ path.style.strokeDasharray=''; path.style.strokeDashoffset=''; } };
+  const t0 = performance.now();
+  dur = dur || 1500;
   const step = t => {
     const f = Math.min(1,(t-t0)/dur);
+    const e = f<.5 ? 2*f*f : 1-Math.pow(-2*f+2,2)/2;      // leave gently, arrive gently
     let L, p, q;
     try{
       L = path.getTotalLength();
-      if(!L){ g.remove(); return; }
-      p = path.getPointAtLength(L*f);
-      q = path.getPointAtLength(Math.min(L, L*f + Math.max(1, L*0.02)));
-    }catch(e){ g.remove(); return; }
+      if(!L){ g.remove(); clear(); return; }
+      p = path.getPointAtLength(L*e);
+      q = path.getPointAtLength(Math.min(L, L*e + Math.max(1, L*0.02)));
+    }catch(err){ g.remove(); clear(); return; }
+    if(+path.dataset.anim === mine){
+      path.style.strokeDasharray = L;
+      path.style.strokeDashoffset = L*(1-e);
+    }
     const ang = Math.atan2(q.y-p.y, q.x-p.x) * 180/Math.PI;
     const rot = (type==='f') ? ang + 45 : 0;        /* the plane glyph points NE */
     g.setAttribute('transform', `translate(${p.x},${p.y}) rotate(${rot})`);
-    g.setAttribute('opacity', f<.08 ? f/.08 : (f>.92 ? (1-f)/.08 : 1));
-    if(f<1) requestAnimationFrame(step); else g.remove();
+    g.setAttribute('opacity', f<.08 ? f/.08 : (f>.94 ? (1-f)/.06 : 1));
+    if(f<1) requestAnimationFrame(step); else { g.remove(); clear(); }
   };
   requestAnimationFrame(step);
 }
@@ -686,11 +705,15 @@ function syncMap(idx, animate){
     if(on !== a.el.classList.contains('on')){
       a.el.classList.toggle('on', on);
       if(on && animate){
-        a.el.classList.add('hot'); setTimeout(()=>a.el.classList.remove('hot'), 1400);
+        const span = angDist(a.m.a, a.m.b);
+        const dur = legMs(span);
+        a.el.classList.add('hot'); setTimeout(()=>a.el.classList.remove('hot'), dur+260);
         const mid = gcMid(a.m.a, a.m.b);
         flew = true;
-        aimAt(mid[0], mid[1], 900, zForSpan(angDist(a.m.a, a.m.b) * 1.45), 'arc');
-        setTimeout(()=>comet(a.el, a.m.t), 520);
+        /* the camera lock stays short even on a 5s crossing, or the day-by-day
+           follow would sit blocked for dozens of ticks */
+        aimAt(mid[0], mid[1], Math.min(1100, dur), zForSpan(span * 1.45), 'arc');
+        comet(a.el, a.m.t, dur);
         const k = a.m.b[0].toFixed(2)+','+a.m.b[1].toFixed(2);
         if(nodes[k]) ping(nodes[k].x, nodes[k].y);
         tagMove(a.m);
