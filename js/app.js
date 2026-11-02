@@ -405,7 +405,10 @@ function fitMap(){
     if(oc) oc.setAttribute('r', r1(GL.r));
     svg.setAttribute('viewBox', `${GL.cx-FRAME/2} ${GL.cy-FRAME/2} ${FRAME} ${FRAME}`);
     const narrow = innerWidth < 760;
-    const side = Math.min(innerHeight*0.74, 720);
+    /* Use the screen. The old flat 720px cap left half a 2500px window empty.
+       Bound by height first (so the day card + legend stay visible), then by
+       width, then a sane ceiling. (Nicholas 2026-11-02) */
+    const side = Math.round(Math.max(360, Math.min(innerHeight*0.78, innerWidth*0.58, 1040)));
     /* shrink the card to the globe on desktop so there is no dead gutter
        either side of the square once it is zoomed in */
     if(box){ box.style.maxWidth = narrow ? '' : side + 'px'; box.style.margin = narrow ? '' : '0 auto 30px'; }
@@ -462,7 +465,12 @@ let spinRAF = 0, CAM = null, camLock = 0, AUTOCAM = true, AUTOZOOM = true, PLAYI
    tween. Re-aiming on every day tick used to restart the tween, so the easing
    never got off the starting block and the globe looked frozen. (2026-11-02) */
 function aimAt(lat,lon,ms=1100,z,kind='arc'){
-  if(GL.mode!=='globe' || REDUCED) return;
+  /* prefers-reduced-motion used to hard-return here, so on any machine with
+     Windows "show animations" off (or the browser flag set) the globe simply
+     never followed the year while everything else played. Reduced motion now
+     means SNAP to the target instead of easing to it, not refuse to move.
+     (Nicholas desktop vs phone, 2026-11-02) */
+  if(GL.mode!=='globe') return;
   if(!AUTOCAM) return;
   const now = performance.now();
   if(kind==='day' && now < camLock) return;       // a leg in flight owns the camera for a beat
@@ -472,6 +480,12 @@ function aimAt(lat,lon,ms=1100,z,kind='arc'){
           phi: Math.max(-62, Math.min(62, lat*0.85)),
           z: z1,
           k: kind==='arc' ? 0.055 : 0.075 };
+  if(REDUCED){                       /* no tween: jump straight there */
+    GL.lam = ((CAM.lam + 540) % 360) - 180;
+    GL.phi = Math.max(-78, Math.min(78, CAM.phi));
+    if(Math.abs(CAM.z - GL.z) > 0.003){ GL.z = CAM.z; fitMap(); }
+    CAM = null; renderMap(); return;
+  }
   runTween();
 }
 /* point the camera at wherever he woke up on day idx */
@@ -939,3 +953,9 @@ function showTip(e,d){
   t.style.opacity = 1;
 }
 function hideTip(){ $('#tip').style.opacity = 0; }
+
+/* Diagnostics hook: lets an e2e run read the true camera state instead of
+   guessing from the DOM. Read-only. (2026-11-02) */
+window.__globe = () => ({ reduced: REDUCED, auto: AUTOCAM, autozoom: AUTOZOOM,
+  playing: PLAYING, mode: GL.mode, lam: +GL.lam.toFixed(2), phi: +GL.phi.toFixed(2),
+  z: +GL.z.toFixed(3), day: +(document.getElementById('scrub')||{value:-1}).value });
