@@ -105,11 +105,12 @@ a:hover{text-decoration:underline}
 }
 #map{display:block;width:100%;height:auto}
 #gLand > path{fill:#161c2e;stroke:#232c45;stroke-width:.7;vector-effect:non-scaling-stroke}
-.arc{fill:none;stroke-linecap:round;opacity:0;transition:opacity .35s}
+.arc{fill:none;stroke-linecap:round;opacity:0;transition:opacity .35s;
+     vector-effect:non-scaling-stroke;stroke-width:var(--aw,2px)}
 .arc.on{opacity:.75}
-.arc.f{stroke:#a78bfa;stroke-width:1.5}
-.arc.c{stroke:#14cfe0;stroke-width:1.6;stroke-dasharray:none}
-.arc.r{stroke:#ffc234;stroke-width:1.3}
+.arc.f{stroke:#a78bfa}
+.arc.c{stroke:#14cfe0;stroke-dasharray:none}
+.arc.r{stroke:#ffc234}
 .arc.hot{opacity:1;filter:url(#glow)}
 .nd{fill:#fff;opacity:0;transition:opacity .4s,r .4s}
 .nd.on{opacity:.9}
@@ -330,7 +331,7 @@ footer{max-width:1180px;margin:80px auto 0;padding:34px 20px 70px;border-top:1px
 }
 .mapbtns .mb.on{color:#fff;border-color:rgba(20,207,224,.55);background:rgba(20,207,224,.12)}
 .mapbtns .mb:hover{color:#fff}
-.arc.back{opacity:.16;stroke-dasharray:2.5 3.5;stroke-width:1}
+.arc.back{opacity:.16;stroke-dasharray:2.5 3.5;stroke-width:calc(var(--aw,2px) * .55)}
 .arc.back.on{opacity:.3}
 #map{width:100%;height:auto;display:block}
 @media(max-width:760px){ .mapwrap{height:auto} }
@@ -353,8 +354,20 @@ footer{max-width:1180px;margin:80px auto 0;padding:34px 20px 70px;border-top:1px
   paint-order:stroke; stroke:rgba(5,8,16,.85); stroke-width:3px; pointer-events:none
 }
 .nd{fill:rgba(220,235,255,.85)}
+.vgrp{pointer-events:none}
+/* the puck: a dark disc so the glyph reads over an amber lit country AND over
+   black ocean. Tinted by mode so you can tell a flight from a crossing. */
+.vpuck{fill:rgba(7,11,24,.82); stroke:rgba(255,255,255,.55)}
+.vpuck.v-f{stroke:#c4b5fd}
+.vpuck.v-c{stroke:#5eead4}
+.vpuck.v-r,.vpuck.v-b{stroke:#ffd27a}
 .vehicle{
-  font-size:15px; text-anchor:middle; dominant-baseline:central;
-  filter:drop-shadow(0 0 5px rgba(255,255,255,.55)); pointer-events:none
+  text-anchor:middle; dominant-baseline:central; pointer-events:none;
+  /* measured 2026-11-02: the plane was being painted in BLACK (fill defaulted
+     to #000) on a near-black globe - only its glow made it visible at all. */
+  fill:#ffffff; paint-order:stroke; stroke:rgba(5,9,20,.92); stroke-linejoin:round;
+  filter:drop-shadow(0 0 4px rgba(120,170,255,.7))
 }
-.v-c,.v-r,.v-b{font-size:14px}
+.vehicle.v-f{fill:#ede9fe}
+.vehicle.v-c{fill:#d6fffb}
+.vehicle.v-r,.vehicle.v-b{fill:#fff1cf}

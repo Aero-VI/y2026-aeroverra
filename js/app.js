@@ -392,6 +392,23 @@ function drawMap(land, ctys){
 
 /* On a phone a 1200x500 box renders the globe about 150px across, which is
    useless. Crop the viewBox to a square around the sphere instead. */
+let UPP = 1;              /* viewBox user units per rendered CSS pixel */
+function measureUPP(svg){
+  const w = svg.getBoundingClientRect().width;
+  if(w > 0) UPP = (GL.mode==='globe' ? FRAME : MAPW) / w;
+  /* route lines had the same shrink problem as the glyphs: a 1.5-unit stroke
+     is 2.6 CSS px on an 840px globe but 1.1px on a 370px phone, i.e. a
+     hairline. Drive the width in real pixels off one custom property. */
+  const wpx = (GL.mode==='globe' ? FRAME : MAPW) / (UPP || 1);
+  svg.style.setProperty('--aw', r1(clampN(wpx*0.0029, 1.9, 3.1)) + 'px');
+}
+/* The glyphs live in a fixed 486-unit viewBox, so a flat font-size shrank with
+   the map: measured 9.6px wide on a 412px phone vs 26.2px on a 2460px desktop.
+   Size them in PIXELS instead and convert. (Nicholas 2026-11-02) */
+function glyphPx(){
+  const wpx = (GL.mode==='globe' ? FRAME : MAPW) / (UPP || 1);
+  return clampN(wpx * 0.034, 23, 31);
+}
 function fitMap(){
   const svg = document.getElementById('map');
   if(!svg) return;
@@ -418,11 +435,13 @@ function fitMap(){
     svg.style.maxWidth = '100%';
     svg.style.margin = '0 auto';
     svg.style.display = 'block';
+    measureUPP(svg);
   } else {
     svg.setAttribute('viewBox', `0 0 ${MAPW} ${MAPH}`);
     if(box){ box.style.maxWidth=''; box.style.margin=''; }
     svg.style.aspectRatio=''; svg.style.width='100%'; svg.style.height='auto';
     svg.style.maxWidth=''; svg.style.margin=''; svg.style.display='block';
+    measureUPP(svg);
   }
 }
 
@@ -481,7 +500,11 @@ const ZMAX = 7;          /* manual ceiling */
 const AUTOZMAX = 2.6;    /* the camera never zooms itself past this - a 7x auto
                             zoom filled the card with a flat slab of one country
                             and no horizon (Nicholas 2026-11-02) */
-const CAMT = { lam: GL.lam, phi: GL.phi, z: GL.z, tau: 0.42 };
+const AUTOZMAX_DAY = 4.2; /* a settled day may creep in tighter than a leg: a
+                             whole country framed at 2.6 hides every short hop
+                             inside it (Nicholas 2026-11-02, "can't see all the
+                             smaller hops"). Generic, from the country bbox. */
+const CAMT = { lam: GL.lam, phi: GL.phi, z: GL.z, tau: 0.42, ztau: 0.42 };
 let CAMON = false;
 
 const clampN = (v,a,b) => v<a?a:(v>b?b:v);
@@ -504,36 +527,78 @@ function angDist(a,b){
 }
 
 /* point the camera somewhere. tau = seconds to close ~63% of the gap. */
-function aimAt(lat,lon,tau,z,kind='arc'){
+function aimAt(lat,lon,tau,z,kind='arc',zmax,ztau){
   if(GL.mode!=='globe' || !AUTOCAM) return;
   if(kind==='day' && LEGS.size) return;      /* a leg in flight owns the camera */
   CAMT.lam = lon;
   CAMT.phi = clampN(lat*0.9, -62, 62);
-  if(AUTOZOOM && z!=null) CAMT.z = clampN(z, 1, AUTOZMAX);
+  if(AUTOZOOM && z!=null){
+    const nz = clampN(z, 1, zmax || AUTOZMAX);
+    /* pulling OUT is a reaction and should be quick; pushing IN is the slow
+       settle he asked for. Same law either way, different time constant. */
+    CAMT.ztau = ztau != null ? ztau : (nz > CAMT.z ? 1.7 : 0.5);
+    CAMT.z = nz;
+  }
   CAMT.tau = Math.max(0.08, tau || 0.42);
   CAMON = true;
   pump();
+}
+/* bbox of a country's polygons, cached. Used for BOTH the day framing and the
+   sea-day question "am I coming back to the same place?". */
+const CCBOX = {};
+function ccBox(cc){
+  if(cc in CCBOX) return CCBOX[cc];
+  const c = ctyPaths.find(x => x.cc === cc);
+  if(!c){ return CCBOX[cc] = null; }
+  let laMin=90,laMax=-90,loMin=180,loMax=-180;
+  for(const r of c.rings){ for(const pt of r){
+    laMin=Math.min(laMin,pt[0]); laMax=Math.max(laMax,pt[0]);
+    loMin=Math.min(loMin,pt[1]); loMax=Math.max(loMax,pt[1]);
+  } }
+  const span = Math.max(laMax-laMin, (loMax-loMin)*Math.cos(((laMin+laMax)/2)*R));
+  return CCBOX[cc] = { span, lat:(laMin+laMax)/2, lon:(loMin+loMax)/2 };
+}
+/* zoom that frames a country with a little air around it. 1.25 (was 2.1) so a
+   country actually FILLS the frame - at 2.1 Japan sat in the middle at half
+   size and every Tokyo-Osaka hop was 6px long. */
+function zForCC(cc){
+  const b = ccBox(cc);
+  return b ? zForSpan(Math.max(b.span,0.4)*1.25) : null;
+}
+/* Which countries should be lit on day idx. On a sea day we normally light
+   nothing - but if the land either side of the crossing is the SAME country,
+   dropping the highlight for a day is just a blink. 5 of the 14 sea runs in
+   2026 are exactly that (4x Australia, 1x USA). Generic, no hardcoded cc. */
+function hotFor(idx){
+  const d = D.days[idx]; if(!d) return [];
+  const cc = d.ccs || [];
+  if(!cc.includes('SEA')) return cc;
+  let before = null, after = null;
+  for(let i=idx-1;i>=0;i--){ const c=(D.days[i].ccs)||[]; if(!c.includes('SEA')){ before=c; break; } }
+  for(let i=idx+1;i<D.days.length;i++){ const c=(D.days[i].ccs)||[]; if(!c.includes('SEA')){ after=c; break; } }
+  if(before && after && before.join(',') === after.join(',')) return before;
+  return [];
 }
 /* point the camera at wherever he woke up on day idx */
 let aimCC = null;
 function aimDay(idx, tau){
   const d = D.days[idx]; if(!d) return;
   const pos = DAYPOS[idx];
-  let z = null;
+  let z = null, zmax = AUTOZMAX_DAY, ztau;
   const cc = (d.ccs||[])[0];
   if(cc && cc!=='SEA'){
-    const c = ctyPaths.find(x => x.cc === cc);
-    if(c){
-      let laMin=90,laMax=-90,loMin=180,loMax=-180;
-      for(const r of c.rings){ for(const pt of r){
-        laMin=Math.min(laMin,pt[0]); laMax=Math.max(laMax,pt[0]);
-        loMin=Math.min(loMin,pt[1]); loMax=Math.max(loMax,pt[1]);
-      } }
-      const span = Math.max(laMax-laMin, (loMax-loMin)*Math.cos(((laMin+laMax)/2)*R));
-      z = zForSpan(span*2.1);
-    }
-  } else { z = 1.5; }            /* mid-ocean: there is no coastline to frame */
-  if(pos) aimAt(pos[0], pos[1], tau || 0.55, z, 'day');
+    z = zForCC(cc);
+    /* arriving somewhere new: creep in. Already here: hold, no re-zoom wobble */
+    ztau = (cc === aimCC) ? 0.9 : 1.9;
+  } else {
+    /* mid-ocean. If the crossing starts and ends in the same country there is
+       no reason to pull all the way out to 1.5 and shove back in again. */
+    const keep = hotFor(idx)[0];
+    const zk = keep ? zForCC(keep) : null;
+    z = zk != null ? zk : 1.5;
+    ztau = zk != null ? 1.2 : 0.7;
+  }
+  if(pos) aimAt(pos[0], pos[1], tau || 0.55, z, 'day', zmax, ztau);
   aimCC = cc;
 }
 
@@ -541,6 +606,7 @@ function aimDay(idx, tau){
 function camStep(dt){
   if(!CAMON) return false;
   const k  = 1 - Math.exp(-dt/CAMT.tau);
+  const kz = 1 - Math.exp(-dt/(CAMT.ztau || CAMT.tau));
   const d  = angDist([GL.phi, GL.lam], [CAMT.phi, CAMT.lam]);
   const dz = CAMT.z - GL.z;
   if(d < 0.04 && Math.abs(dz) < 0.002){ CAMON = false; return false; }
@@ -549,7 +615,7 @@ function camStep(dt){
     GL.phi = clampN(p[0], -78, 78);
     GL.lam = ((p[1] + 540) % 360) - 180;
   }
-  if(Math.abs(dz) > 0.002){ GL.z = clampN(GL.z + dz*k, 1, ZMAX); fitMap(); }
+  if(Math.abs(dz) > 0.002){ GL.z = clampN(GL.z + dz*kz, 1, ZMAX); fitMap(); }
   return true;
 }
 function pump(){
@@ -581,7 +647,11 @@ function frame(t){
   if(steer && AUTOCAM){
     CAMT.lam = steer.pos[1];
     CAMT.phi = clampN(steer.pos[0]*0.9, -62, 62);
-    if(AUTOZOOM) CAMT.z = clampN(steer.zFit, 1, AUTOZMAX);
+    if(AUTOZOOM){
+      const nz = clampN(steer.zFit, 1, AUTOZMAX);
+      CAMT.ztau = nz > CAMT.z ? 1.0 : 0.45;
+      CAMT.z = nz;
+    }
     CAMT.tau = steer.phase === 'lead' ? 0.34 : 0.5;
     CAMON = true;
   }
@@ -736,13 +806,20 @@ const LEGS = new Set();
    all off the one clock in frame(). No private rAF, no reduced-motion bail. */
 function flyLeg(path, type, a, b, dur){
   const NS='http://www.w3.org/2000/svg';
-  const g = document.createElementNS(NS,'text');
-  g.setAttribute('class','vehicle v-'+(type||'f'));
-  g.textContent = GLYPH[type] || GLYPH.f;
+  /* group = dark puck + glyph. The puck exists because a lit country is amber
+     and the ocean is near-black: no single glyph colour reads on both. */
+  const g  = document.createElementNS(NS,'g');
+  const pk = document.createElementNS(NS,'circle');
+  const tx = document.createElementNS(NS,'text');
+  g.setAttribute('class','vgrp');
+  pk.setAttribute('class','vpuck v-'+(type||'f'));
+  tx.setAttribute('class','vehicle v-'+(type||'f'));
+  tx.textContent = GLYPH[type] || GLYPH.f;
+  g.appendChild(pk); g.appendChild(tx);
   g.setAttribute('opacity', 0);
   $('#gLive').appendChild(g);
   const leg = {
-    path, type, a, b, g, dur,
+    path, type, a, b, g, gt:tx, gp:pk, dur,
     lead: clampN(dur*0.18, 160, 460),      /* camera gets there first */
     zFit: zForSpan(angDist(a,b) * 1.5),
     t0: performance.now(), f:0, e:0, phase:'lead', pos:a, seq:++animSeq
@@ -800,11 +877,20 @@ function paintLeg(leg){
     path.style.strokeDasharray  = L || 0;
     path.style.strokeDashoffset = L ? (L - cut) : 0;
   }
+  const fs = glyphPx() * UPP;                 /* constant size on screen */
+  if(leg.fs !== fs){
+    leg.fs = fs;
+    leg.gt.setAttribute('font-size', r1(fs));
+    leg.gt.setAttribute('stroke-width', r1(fs*0.16));
+    leg.gp.setAttribute('r', r1(fs*0.62));
+    leg.gp.setAttribute('stroke-width', r1(fs*0.05));
+  }
   if(!L || !vis){ leg.g.setAttribute('opacity', 0); return; }
   const ah = slerpLL(leg.a, leg.b, Math.min(1, leg.e + 0.02));
   const [x2,y2] = proj(ah[0], ah[1]);
   const ang = Math.atan2(y2-y, x2-x) * 180/Math.PI;
-  leg.g.setAttribute('transform', `translate(${r1(x)},${r1(y)}) rotate(${leg.type==='f' ? ang+45 : 0})`);
+  leg.gt.setAttribute('transform', leg.type==='f' ? `rotate(${r1(ang+45)})` : '');
+  leg.g.setAttribute('transform', `translate(${r1(x)},${r1(y)})`);
   const fade = leg.phase === 'lead' ? Math.min(1, (performance.now()-leg.t0)/260)
              : (leg.f > .94 ? (1-leg.f)/.06 : 1);
   leg.g.setAttribute('opacity', clampN(fade,0,1));
@@ -842,7 +928,7 @@ function syncMap(idx, animate){
   const d = D.days[idx];
   $('#mapNow').textContent = d ? (d.city ? d.city : (d.ccs[0] ? nameOf(d.ccs[0]) : '')) : '';
   if(d){
-    setHot(d.ccs || []);
+    setHot(hotFor(idx));
     if(!flew) aimDay(idx, PLAYING ? clampN(speed/90, 0.22, 0.8) : 0.6);
   }
   lastIdx = idx;
