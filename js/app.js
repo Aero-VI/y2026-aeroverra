@@ -48,7 +48,7 @@ fetch('data/year2026.json?v=14').then(r=>r.json()).then(data=>{
   buildDayPos();
   drawMap(land, ctys);
   syncMap(+$('#scrub').value);
-  aimDay(+$('#scrub').value, 900);
+  aimDay(+$('#scrub').value, 0.8);
 });
 
 /* ---------------- hero ---------------- */
@@ -386,7 +386,7 @@ function drawMap(land, ctys){
   fitMap();
   renderMap();
   mapControls();
-  if(GL.spin && !REDUCED) runTween();
+  if(GL.spin && !REDUCED) pump();
   addEventListener('resize', ()=>{ fitMap(); renderMap(); });
 }
 
@@ -443,7 +443,7 @@ function renderMap(){
       const [f,b] = lineOfSplit(a.pts);
       a.el.setAttribute('d', f);
       a.elB.setAttribute('d', b);
-      a.elB.style.display = a.el.classList.contains('on') ? '' : 'none';
+      a.elB.style.display = (a.el.classList.contains('on') && !a.el.dataset.drawing) ? '' : 'none';
     } else {
       a.el.setAttribute('d', lineOf(a.pts,false));
       a.elB.setAttribute('d','');
@@ -459,38 +459,64 @@ function renderMap(){
   }
 }
 
-/* --- turn the globe, smoothly --- */
-let spinRAF = 0, CAM = null, camLock = 0, AUTOCAM = true, AUTOZOOM = true, PLAYING = false, autoBtn = null;
-/* The camera is a TARGET the globe eases toward every frame, not a fixed-length
-   tween. Re-aiming on every day tick used to restart the tween, so the easing
-   never got off the starting block and the globe looked frozen. (2026-11-02) */
-function aimAt(lat,lon,ms=1100,z,kind='arc'){
-  /* prefers-reduced-motion used to hard-return here, so on any machine with
-     Windows "show animations" off (or the browser flag set) the globe simply
-     never followed the year while everything else played. Reduced motion now
-     means SNAP to the target instead of easing to it, not refuse to move.
-     (Nicholas desktop vs phone, 2026-11-02) */
-  if(GL.mode!=='globe') return;
-  if(!AUTOCAM) return;
-  const now = performance.now();
-  if(kind==='day' && now < camLock) return;       // a leg in flight owns the camera for a beat
-  if(kind==='arc') camLock = now + ms;
-  const z1 = (!AUTOZOOM || z==null) ? GL.z : Math.max(1, Math.min(ZMAX, z));
-  CAM = { lam: lon,
-          phi: Math.max(-62, Math.min(62, lat*0.85)),
-          z: z1,
-          k: kind==='arc' ? 0.055 : 0.075 };
-  if(REDUCED){                       /* no tween: jump straight there */
-    GL.lam = ((CAM.lam + 540) % 360) - 180;
-    GL.phi = Math.max(-78, Math.min(78, CAM.phi));
-    if(Math.abs(CAM.z - GL.z) > 0.003){ GL.z = CAM.z; fitMap(); }
-    CAM = null; renderMap(); return;
-  }
-  runTween();
+/* --- the camera: ONE clock, chased, never set --------------------------
+   Rewritten 2026-11-02 after Cadence's review. Four real bugs, not style:
+     1. TWO CLOCKS. The line/glyph ran their own rAF while the camera ran
+        another, so they drifted and the camera jumped to catch up with a
+        line that had already finished painting. Everything below now comes
+        off ONE eased t in ONE loop.
+     2. THE CAMERA WAS SET, NOT CHASED, and with a per-FRAME constant, so it
+        was frame-rate dependent. Now: cam = slerp(cam, target, 1-exp(-dt/tau)),
+        which cannot snap and behaves the same at 60 and 144 fps.
+     3. SEPARATE lon/lat TWEENS. Interpolation is on the SPHERE now. Every
+        Pacific leg in this file crosses +/-180 and used to swing the long way.
+     4. prefers-reduced-motion made the camera TELEPORT (that was my "fix" on
+        the last pass, and it is what Nicholas was seeing as snapping). Motion
+        the user pressed play on is content, not decoration: the camera always
+        eases. REDUCED still kills idle spin, pulses and count-ups below.
+   Order per leg: camera frames the leg -> line draws with the glyph on its
+   tip -> camera follows the glyph with lag. Auto-zoom is capped; yours isn't. */
+let RAF = 0, lastT = 0, AUTOCAM = true, AUTOZOOM = true, PLAYING = false, autoBtn = null;
+const ZMAX = 7;          /* manual ceiling */
+const AUTOZMAX = 2.6;    /* the camera never zooms itself past this - a 7x auto
+                            zoom filled the card with a flat slab of one country
+                            and no horizon (Nicholas 2026-11-02) */
+const CAMT = { lam: GL.lam, phi: GL.phi, z: GL.z, tau: 0.42 };
+let CAMON = false;
+
+const clampN = (v,a,b) => v<a?a:(v>b?b:v);
+const toVec = p => { const la=p[0]*R, lo=p[1]*R, c=Math.cos(la); return [c*Math.cos(lo), c*Math.sin(lo), Math.sin(la)]; };
+const toLL  = v => [Math.atan2(v[2], Math.hypot(v[0],v[1]))/R, Math.atan2(v[1],v[0])/R];
+/* real great-circle interpolation (slerp) between two [lat,lon] */
+function slerpLL(a,b,f){
+  const u=toVec(a), v=toVec(b);
+  const d = clampN(u[0]*v[0]+u[1]*v[1]+u[2]*v[2], -1, 1);
+  const o = Math.acos(d);
+  if(o < 1e-7) return [b[0], b[1]];
+  const s = Math.sin(o), k1 = Math.sin((1-f)*o)/s, k2 = Math.sin(f*o)/s;
+  return toLL([u[0]*k1+v[0]*k2, u[1]*k1+v[1]*k2, u[2]*k1+v[2]*k2]);
+}
+/* frame something that spans `deg` degrees of arc */
+function zForSpan(deg){ return Math.max(1, Math.min(ZMAX, 95/Math.max(11, deg))); }
+function angDist(a,b){
+  const [la1,lo1]=[a[0]*R,a[1]*R], [la2,lo2]=[b[0]*R,b[1]*R];
+  return 2*Math.asin(Math.min(1,Math.sqrt(Math.sin((la2-la1)/2)**2 + Math.cos(la1)*Math.cos(la2)*Math.sin((lo2-lo1)/2)**2)))/R;
+}
+
+/* point the camera somewhere. tau = seconds to close ~63% of the gap. */
+function aimAt(lat,lon,tau,z,kind='arc'){
+  if(GL.mode!=='globe' || !AUTOCAM) return;
+  if(kind==='day' && LEGS.size) return;      /* a leg in flight owns the camera */
+  CAMT.lam = lon;
+  CAMT.phi = clampN(lat*0.9, -62, 62);
+  if(AUTOZOOM && z!=null) CAMT.z = clampN(z, 1, AUTOZMAX);
+  CAMT.tau = Math.max(0.08, tau || 0.42);
+  CAMON = true;
+  pump();
 }
 /* point the camera at wherever he woke up on day idx */
 let aimCC = null;
-function aimDay(idx, ms){
+function aimDay(idx, tau){
   const d = D.days[idx]; if(!d) return;
   const pos = DAYPOS[idx];
   let z = null;
@@ -506,37 +532,70 @@ function aimDay(idx, ms){
       const span = Math.max(laMax-laMin, (loMax-loMin)*Math.cos(((laMin+laMax)/2)*R));
       z = zForSpan(span*2.1);
     }
-  } else { z = 1.6; }            /* mid-ocean: pull back a bit, there is no coastline to frame */
-  if(pos) aimAt(pos[0], pos[1], ms || 420, z, 'day');
+  } else { z = 1.5; }            /* mid-ocean: there is no coastline to frame */
+  if(pos) aimAt(pos[0], pos[1], tau || 0.55, z, 'day');
   aimCC = cc;
 }
-/* frame something that spans `deg` degrees of arc */
-const ZMAX = 7;
-function zForSpan(deg){ return Math.max(1, Math.min(ZMAX, 95/Math.max(11, deg))); }
-function angDist(a,b){
-  const [la1,lo1]=[a[0]*R,a[1]*R], [la2,lo2]=[b[0]*R,b[1]*R];
-  return 2*Math.asin(Math.sqrt(Math.sin((la2-la1)/2)**2 + Math.cos(la1)*Math.cos(la2)*Math.sin((lo2-lo1)/2)**2))/R;
+
+/* ---- the single loop: legs advance, camera chases, then we paint ---- */
+function camStep(dt){
+  if(!CAMON) return false;
+  const k  = 1 - Math.exp(-dt/CAMT.tau);
+  const d  = angDist([GL.phi, GL.lam], [CAMT.phi, CAMT.lam]);
+  const dz = CAMT.z - GL.z;
+  if(d < 0.04 && Math.abs(dz) < 0.002){ CAMON = false; return false; }
+  if(d >= 0.04){
+    const p = slerpLL([GL.phi, GL.lam], [CAMT.phi, CAMT.lam], k);
+    GL.phi = clampN(p[0], -78, 78);
+    GL.lam = ((p[1] + 540) % 360) - 180;
+  }
+  if(Math.abs(dz) > 0.002){ GL.z = clampN(GL.z + dz*k, 1, ZMAX); fitMap(); }
+  return true;
 }
-function runTween(){
-  cancelAnimationFrame(spinRAF);
-  const loop = () => {
-    let busy = false;
-    if(CAM){
-      const dl = ((CAM.lam - GL.lam + 540) % 360) - 180;
-      const dp = CAM.phi - GL.phi, dz = CAM.z - GL.z;
-      if(Math.abs(dl) > 0.06 || Math.abs(dp) > 0.06 || Math.abs(dz) > 0.003){
-        GL.lam = ((GL.lam + dl*CAM.k) + 540) % 360 - 180;
-        GL.phi = Math.max(-78, Math.min(78, GL.phi + dp*CAM.k));
-        if(Math.abs(dz) > 0.003){ GL.z = Math.max(1, Math.min(ZMAX, GL.z + dz*CAM.k)); fitMap(); }
-        busy = true;
-      } else { CAM = null; }
+function pump(){
+  if(RAF) return;                       /* one loop, never two */
+  lastT = 0;
+  RAF = requestAnimationFrame(frame);
+}
+function frame(t){
+  RAF = 0;
+  const dt = clampN(lastT ? (t - lastT)/1000 : 0.016, 0.001, 0.05);
+  lastT = t;
+  let busy = false;
+
+  /* 1. advance every live leg off the shared clock, newest one steers */
+  let steer = null;
+  for(const leg of LEGS){
+    const el = t - leg.t0;
+    if(el < leg.lead){ leg.f = 0; leg.e = 0; leg.phase = 'lead'; }
+    else {
+      leg.f = Math.min(1, (el - leg.lead)/leg.dur);
+      leg.e = leg.f < .5 ? 2*leg.f*leg.f : 1 - Math.pow(-2*leg.f+2,2)/2;
+      leg.phase = 'fly';
     }
-    if(GL.spin && !CAM && !PLAYING){ GL.lam = (GL.lam + GL.rate + 540)%360 - 180; busy = true; }
-    renderMap();
-    if(busy) spinRAF = requestAnimationFrame(loop);
-  };
-  spinRAF = requestAnimationFrame(loop);
+    leg.pos = leg.e <= 0 ? leg.a : slerpLL(leg.a, leg.b, leg.e);
+    steer = leg;
+    busy = true;
+  }
+  /* 2. aim at the glyph (the camera lags it by tau, which is the point) */
+  if(steer && AUTOCAM){
+    CAMT.lam = steer.pos[1];
+    CAMT.phi = clampN(steer.pos[0]*0.9, -62, 62);
+    if(AUTOZOOM) CAMT.z = clampN(steer.zFit, 1, AUTOZMAX);
+    CAMT.tau = steer.phase === 'lead' ? 0.34 : 0.5;
+    CAMON = true;
+  }
+  /* 3. chase, 4. render, 5. THEN paint the legs onto fresh geometry */
+  if(camStep(dt)) busy = true;
+  if(GL.spin && !CAMON && !PLAYING && !REDUCED && !LEGS.size){
+    GL.lam = (GL.lam + GL.rate + 540)%360 - 180; busy = true;
+  }
+  renderMap();
+  for(const leg of [...LEGS]){ paintLeg(leg); if(leg.f >= 1) endLeg(leg); }
+
+  if(busy || LEGS.size) RAF = requestAnimationFrame(frame);
 }
+const runTween = pump;     /* old name, same loop */
 
 /* which countries are lit right now */
 function setHot(ccs){
@@ -590,7 +649,7 @@ function mapControls(){
   autoBtn = mk('AUTO','Camera follows the action and zooms to the country', true, b=>{
     AUTOCAM = !AUTOCAM; b.classList.toggle('on', AUTOCAM);
     AUTOZOOM = AUTOCAM;
-    if(AUTOCAM){ GL.z = 1; fitMap(); renderMap(); syncMap(+$('#scrub').value); aimDay(+$('#scrub').value, 700); }
+    if(AUTOCAM){ GL.z = 1; fitMap(); renderMap(); syncMap(+$('#scrub').value); aimDay(+$('#scrub').value, 0.6); }
   });
   mk('＋','Zoom in', false, ()=>zoom(1.35));
   mk('－','Zoom out', false, ()=>zoom(1/1.35));
@@ -665,54 +724,90 @@ const GLYPH = { f:'\u2708', c:'\uD83D\uDEF3', r:'\uD83D\uDE86', b:'\uD83D\uDE8C'
    Pacific crossing should take its time. Length-scaled instead of a flat 1.5s
    for everything, and it rides the playback speed. (Nicholas 2026-11-02) */
 function legMs(deg){
-  const base = 620 + Math.pow(Math.max(0,deg), 0.85) * 62;   // 5deg~0.9s, 60deg~2.7s, 160deg~5.2s
-  const scale = PLAYING ? Math.max(0.5, Math.min(1.6, speed/70)) : 1;
-  return Math.round(Math.max(600, Math.min(5200, base)) * scale);
+  /* retuned 2026-11-02: the day clock now HOLDS for the leg, so leg time is
+     real playback time. 0.3s for a tram hop, 2.5s for LA->Brisbane. */
+  const base = 300 + Math.pow(Math.max(0,deg), 0.78) * 60;   // 5deg~0.5s, 60deg~1.8s, 104deg~2.5s
+  const scale = PLAYING ? Math.max(0.3, Math.min(1.6, speed/70)) : 1;
+  return Math.round(Math.max(320, Math.min(2600, base)) * scale);
 }
 let animSeq = 0;
-/* The glyph flies AND the line draws itself behind it, over the same clock. */
-function comet(path, type, dur){
-  if(REDUCED) return;
+const LEGS = new Set();
+/* A leg: the camera frames it, then the line draws itself BEHIND the glyph,
+   all off the one clock in frame(). No private rAF, no reduced-motion bail. */
+function flyLeg(path, type, a, b, dur){
   const NS='http://www.w3.org/2000/svg';
-  /* Do NOT bail when the path has no length yet: at the instant a leg turns on
-     the camera has only just started easing toward it, so the arc is often
-     still on the BACK of the globe and the front path is empty. The old code
-     killed the glyph on frame 1 and the whole flight animated invisibly.
-     (Nicholas 2026-11-02) */
   const g = document.createElementNS(NS,'text');
   g.setAttribute('class','vehicle v-'+(type||'f'));
   g.textContent = GLYPH[type] || GLYPH.f;
+  g.setAttribute('opacity', 0);
   $('#gLive').appendChild(g);
-  const mine = ++animSeq;
-  path.dataset.anim = mine;
-  const clear = () => { if(+path.dataset.anim === mine){ path.style.strokeDasharray=''; path.style.strokeDashoffset=''; } };
-  const t0 = performance.now();
-  dur = dur || 1500;
-  const step = t => {
-    const f = Math.min(1,(t-t0)/dur);
-    const e = f<.5 ? 2*f*f : 1-Math.pow(-2*f+2,2)/2;      // leave gently, arrive gently
-    let L = 0, p, q;
-    try{ L = path.getTotalLength(); }catch(err){ L = 0; }
-    if(!L){                                  // arc is round the back right now
-      g.setAttribute('opacity', 0);
-      if(f<1) requestAnimationFrame(step); else { g.remove(); clear(); }
-      return;
-    }
-    try{
-      p = path.getPointAtLength(L*e);
-      q = path.getPointAtLength(Math.min(L, L*e + Math.max(1, L*0.02)));
-    }catch(err){ g.remove(); clear(); return; }
-    if(+path.dataset.anim === mine){
-      path.style.strokeDasharray = L;
-      path.style.strokeDashoffset = L*(1-e);
-    }
-    const ang = Math.atan2(q.y-p.y, q.x-p.x) * 180/Math.PI;
-    const rot = (type==='f') ? ang + 45 : 0;        /* the plane glyph points NE */
-    g.setAttribute('transform', `translate(${p.x},${p.y}) rotate(${rot})`);
-    g.setAttribute('opacity', f<.08 ? f/.08 : (f>.94 ? (1-f)/.06 : 1));
-    if(f<1) requestAnimationFrame(step); else { g.remove(); clear(); }
+  const leg = {
+    path, type, a, b, g, dur,
+    lead: clampN(dur*0.18, 160, 460),      /* camera gets there first */
+    zFit: zForSpan(angDist(a,b) * 1.5),
+    t0: performance.now(), f:0, e:0, phase:'lead', pos:a, seq:++animSeq
   };
-  requestAnimationFrame(step);
+  while(LEGS.size >= 2){ const old = LEGS.values().next().value; old.e = 1; paintLeg(old); endLeg(old); }
+  path.dataset.anim = leg.seq;
+  path.dataset.drawing = '1';
+  path.style.strokeDasharray = '0 99999';   /* nothing painted yet */
+  path.style.strokeDashoffset = 0;
+  LEGS.add(leg);
+  pump();
+  return leg;
+}
+function endLeg(leg){
+  LEGS.delete(leg);
+  if(leg.g) leg.g.remove();
+  if(+leg.path.dataset.anim === leg.seq){
+    leg.path.style.strokeDasharray = '';
+    leg.path.style.strokeDashoffset = '';
+    delete leg.path.dataset.drawing;
+  }
+  if(!LEGS.size && lastIdx >= 0) aimDay(lastIdx, 0.6);
+}
+/* Find the length along `path` whose point is nearest (x,y). The line is drawn
+   up to THAT length, so the painted tip is always exactly under the glyph.
+   Driving the dash off e directly left a visible gap: screen arc-length and
+   great-circle fraction are different parameterisations, and near the limb they
+   diverge badly. (measured 2026-11-02, plane was ~70px ahead of its own line) */
+function lenAtPoint(path, L, x, y){
+  let best = 0, bd = Infinity;
+  const N = 26;
+  for(let i=0;i<=N;i++){
+    const l = L*i/N, p = path.getPointAtLength(l);
+    const d = (p.x-x)**2 + (p.y-y)**2;
+    if(d < bd){ bd = d; best = l; }
+  }
+  let lo = Math.max(0, best - L/N), hi = Math.min(L, best + L/N);
+  for(let i=0;i<9;i++){
+    const m1 = lo + (hi-lo)/3, m2 = hi - (hi-lo)/3;
+    const p1 = path.getPointAtLength(m1), p2 = path.getPointAtLength(m2);
+    if((p1.x-x)**2+(p1.y-y)**2 < (p2.x-x)**2+(p2.y-y)**2) hi = m2; else lo = m1;
+  }
+  return (lo+hi)/2;
+}
+function paintLeg(leg){
+  const path = leg.path;
+  let L = 0;
+  try{ L = path.getTotalLength(); }catch(err){ L = 0; }
+  /* the glyph rides the true great-circle point, not getPointAtLength on the
+     clipped front path (which slid it off the line while the globe turned) */
+  const [x,y,vis] = proj(leg.pos[0], leg.pos[1]);
+  if(+path.dataset.anim === leg.seq){
+    let cut = 0;
+    if(L) cut = leg.e >= 1 ? L : lenAtPoint(path, L, x, y);
+    path.style.strokeDasharray  = L || 0;
+    path.style.strokeDashoffset = L ? (L - cut) : 0;
+  }
+  if(!L || !vis){ leg.g.setAttribute('opacity', 0); return; }
+  const ah = slerpLL(leg.a, leg.b, Math.min(1, leg.e + 0.02));
+  const [x2,y2] = proj(ah[0], ah[1]);
+  const ang = Math.atan2(y2-y, x2-x) * 180/Math.PI;
+  leg.g.setAttribute('transform', `translate(${r1(x)},${r1(y)}) rotate(${leg.type==='f' ? ang+45 : 0})`);
+  const fade = leg.phase === 'lead' ? Math.min(1, (performance.now()-leg.t0)/260)
+             : (leg.f > .94 ? (1-leg.f)/.06 : 1);
+  leg.g.setAttribute('opacity', clampN(fade,0,1));
 }
 
 let lastIdx = -1;
@@ -728,13 +823,12 @@ function syncMap(idx, animate){
       if(on && animate){
         const span = angDist(a.m.a, a.m.b);
         const dur = legMs(span);
-        a.el.classList.add('hot'); setTimeout(()=>a.el.classList.remove('hot'), dur+260);
-        const mid = gcMid(a.m.a, a.m.b);
+        a.el.classList.add('hot'); setTimeout(()=>a.el.classList.remove('hot'), dur+1200);
         flew = true;
-        /* the camera lock stays short even on a 5s crossing, or the day-by-day
-           follow would sit blocked for dozens of ticks */
-        aimAt(mid[0], mid[1], Math.min(1100, dur), zForSpan(span * 1.45), 'arc');
-        comet(a.el, a.m.t, dur);
+        /* no separate aimAt here any more: the leg itself steers the camera
+           every frame from inside frame(), which is what stops the camera and
+           the line disagreeing about where the plane is */
+        flyLeg(a.el, a.m.t, a.m.a, a.m.b, dur);
         const k = a.m.b[0].toFixed(2)+','+a.m.b[1].toFixed(2);
         if(nodes[k]) ping(nodes[k].x, nodes[k].y);
         tagMove(a.m);
@@ -749,7 +843,7 @@ function syncMap(idx, animate){
   $('#mapNow').textContent = d ? (d.city ? d.city : (d.ccs[0] ? nameOf(d.ccs[0]) : '')) : '';
   if(d){
     setHot(d.ccs || []);
-    if(!flew) aimDay(idx, PLAYING ? Math.max(220, speed*5) : 700);
+    if(!flew) aimDay(idx, PLAYING ? clampN(speed/90, 0.22, 0.8) : 0.6);
   }
   lastIdx = idx;
 }
@@ -768,7 +862,13 @@ function wire(){
     if(i >= END) i = 0;
     arcs.forEach(a=>a.el.classList.remove('on'));
     Object.values(nodes).forEach(n=>n.el.classList.remove('on'));
+    /* The day clock HOLDS while a leg is in flight. Without this a 5s Pacific
+       crossing covered ~70 simulated days, so up to 14 legs animated at once
+       and they fought over the camera (measured 2026-11-02). One journey at a
+       time: the year waits for the plane to land, which is also how it should
+       read. */
     timer = setInterval(()=>{
+      for(const l of LEGS) if(l.f < 0.62) return;   /* let the tail overlap the next day */
       setReadout(i,true); scrub.value = i; syncMap(i, true);
       const t = tiles[i];
       if(t && i%7===0) keepVisible(t);
@@ -776,7 +876,7 @@ function wire(){
       if(i>END) stop();
     }, speed);
   });
-  scrub.addEventListener('input',()=>{ setReadout(+scrub.value,true); syncMap(+scrub.value); });
+  scrub.addEventListener('input',()=>{ [...LEGS].forEach(endLeg); setReadout(+scrub.value,true); syncMap(+scrub.value); });
   document.querySelectorAll('.sp').forEach(b=>b.addEventListener('click',()=>{
     document.querySelectorAll('.sp').forEach(x=>x.classList.remove('on'));
     b.classList.add('on'); speed = +b.dataset.sp;
@@ -956,6 +1056,12 @@ function hideTip(){ $('#tip').style.opacity = 0; }
 
 /* Diagnostics hook: lets an e2e run read the true camera state instead of
    guessing from the DOM. Read-only. (2026-11-02) */
-window.__globe = () => ({ reduced: REDUCED, auto: AUTOCAM, autozoom: AUTOZOOM,
+/* read-only test hooks: Camoufox/Playwright evaluate in an isolated world and
+   cannot see module scope, so verification used to be guesswork. (2026-11-02) */
+window.__moves = () => (D.moves||[]).map(m=>({d:m.d,t:m.t,a:m.a,b:m.b,deg:+angDist(m.a,m.b).toFixed(1)}));
+window.__dayIdx = iso => D.days.findIndex(x=>x.d >= iso);
+window.__globe = () => ({ reduced: REDUCED, auto: AUTOCAM, autozoom: AUTOZOOM, legs: LEGS.size,
+  leg: [...LEGS].map(l=>({f:+l.f.toFixed(3), e:+l.e.toFixed(3), ph:l.phase, pos:l.pos.map(v=>+v.toFixed(2)), z:+l.zFit.toFixed(2)}))[0] || null,
+  tgt: { lam:+CAMT.lam.toFixed(2), phi:+CAMT.phi.toFixed(2), z:+CAMT.z.toFixed(3) },
   playing: PLAYING, mode: GL.mode, lam: +GL.lam.toFixed(2), phi: +GL.phi.toFixed(2),
   z: +GL.z.toFixed(3), day: +(document.getElementById('scrub')||{value:-1}).value });
