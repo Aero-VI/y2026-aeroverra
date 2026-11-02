@@ -40,9 +40,16 @@ fetch('data/year2026.json?v=14').then(r=>r.json()).then(data=>{
   wire(); reveal();
   return Promise.all([
     fetch('data/land.json?v=17').then(r=>r.json()),
-    fetch('data/countries.json?v=17').then(r=>r.json()).catch(()=>null)
+    fetch('data/countries.json?v=17').then(r=>r.json()).catch(()=>null),
+    fetch('data/citypos.json?v=21').then(r=>r.json()).catch(()=>({}))
   ]);
-}).then(([land, ctys]) => { drawMap(land, ctys); syncMap(+$('#scrub').value); });
+}).then(([land, ctys, cpos]) => {
+  CITYPOS = cpos || {};
+  buildDayPos();
+  drawMap(land, ctys);
+  syncMap(+$('#scrub').value);
+  aimDay(+$('#scrub').value, 900);
+});
 
 /* ---------------- hero ---------------- */
 function heroStats(){
@@ -249,6 +256,39 @@ function gc(a, b, n){            /* great circle, lat/lon pairs */
 }
 /* midpoint of a great circle, used to aim the globe */
 function gcMid(a,b){ const g = gc(a,b,2); return g[1] || a; }
+/* point f of the way along a great circle (f 0..1) */
+function gcAt(a,b,f){ const n=24, g=gc(a,b,n); return g[Math.max(0,Math.min(n,Math.round(f*n)))] || a; }
+
+/* ---- where he physically IS on day i ----------------------------------
+   Nicholas 2026-11-02: the globe sat still through whole ocean crossings.
+   Days carry a country, not a position, and a sea day's country is "SEA",
+   which matches no polygon, so the camera had nothing to aim at. Build a
+   position for every day off the move chain instead: last arrival for land
+   days, and for a sea day interpolate along the leg to the next port, so
+   the ship actually crawls across the Pacific. */
+const DT = s => Date.parse(s+'T00:00:00Z')/86400000;
+let DAYPOS = [], CITYPOS = {};
+function buildDayPos(){
+  /* a move's `d` is the ARRIVAL date and `a` is the port/airport it left from,
+     so a sea day sits INSIDE the next move: interpolate along next.a -> next.b. */
+  const ms = (D.moves||[]).slice().sort((x,y)=> x.d < y.d ? -1 : x.d > y.d ? 1 : 0);
+  DAYPOS = D.days.map(day => {
+    const t = DT(day.d);
+    let prev=null, next=null;
+    for(const m of ms){ const md = DT(m.d); if(md <= t) prev = m; else { next = m; break; } }
+    if(day.kind !== 'sea'){
+      /* the city he slept in beats the move chain: some hops (the Honolulu
+         flight) were never ticketed, so the chain lags reality */
+      if(day.city && CITYPOS[day.city]) return CITYPOS[day.city];
+      if(prev) return prev.b;
+      return next ? next.a : null;
+    }
+    if(!next) return prev ? prev.b : null;
+    const t0 = prev ? DT(prev.d) : DT(next.d)-1, t1 = DT(next.d);
+    const f = t1 > t0 ? Math.max(0, Math.min(1, (t-t0)/(t1-t0))) : 0.5;
+    return gcAt(next.a, next.b, f);
+  });
+}
 
 /* build a path string from lat/lon points, breaking when they go behind the
    limb (globe) or jump the antimeridian (flat) */
@@ -417,15 +457,44 @@ function renderMap(){
 }
 
 /* --- turn the globe, smoothly --- */
-let spinRAF = 0, tween = null, AUTOCAM = true, autoBtn = null;
-function aimAt(lat,lon,ms=1100,z){
-  if(GL.mode!=='globe' || REDUCED){ return; }
+let spinRAF = 0, CAM = null, camLock = 0, AUTOCAM = true, AUTOZOOM = true, PLAYING = false, autoBtn = null;
+/* The camera is a TARGET the globe eases toward every frame, not a fixed-length
+   tween. Re-aiming on every day tick used to restart the tween, so the easing
+   never got off the starting block and the globe looked frozen. (2026-11-02) */
+function aimAt(lat,lon,ms=1100,z,kind='arc'){
+  if(GL.mode!=='globe' || REDUCED) return;
   if(!AUTOCAM) return;
-  let d = ((lon - GL.lam + 540) % 360) - 180;          // shortest way round
-  const z1 = (z==null ? GL.z : Math.max(1, Math.min(ZMAX, z)));
-  tween = { l0:GL.lam, p0:GL.phi, z0:GL.z, dz:z1-GL.z,
-            dl:d, dp:(Math.max(-62,Math.min(62,lat*0.85)) - GL.phi), t0:performance.now(), ms };
+  const now = performance.now();
+  if(kind==='day' && now < camLock) return;       // a leg in flight owns the camera for a beat
+  if(kind==='arc') camLock = now + ms;
+  const z1 = (!AUTOZOOM || z==null) ? GL.z : Math.max(1, Math.min(ZMAX, z));
+  CAM = { lam: lon,
+          phi: Math.max(-62, Math.min(62, lat*0.85)),
+          z: z1,
+          k: kind==='arc' ? 0.055 : 0.075 };
   runTween();
+}
+/* point the camera at wherever he woke up on day idx */
+let aimCC = null;
+function aimDay(idx, ms){
+  const d = D.days[idx]; if(!d) return;
+  const pos = DAYPOS[idx];
+  let z = null;
+  const cc = (d.ccs||[])[0];
+  if(cc && cc!=='SEA'){
+    const c = ctyPaths.find(x => x.cc === cc);
+    if(c){
+      let laMin=90,laMax=-90,loMin=180,loMax=-180;
+      for(const r of c.rings){ for(const pt of r){
+        laMin=Math.min(laMin,pt[0]); laMax=Math.max(laMax,pt[0]);
+        loMin=Math.min(loMin,pt[1]); loMax=Math.max(loMax,pt[1]);
+      } }
+      const span = Math.max(laMax-laMin, (loMax-loMin)*Math.cos(((laMin+laMax)/2)*R));
+      z = zForSpan(span*2.1);
+    }
+  } else { z = 1.6; }            /* mid-ocean: pull back a bit, there is no coastline to frame */
+  if(pos) aimAt(pos[0], pos[1], ms || 420, z, 'day');
+  aimCC = cc;
 }
 /* frame something that spans `deg` degrees of arc */
 const ZMAX = 7;
@@ -436,23 +505,24 @@ function angDist(a,b){
 }
 function runTween(){
   cancelAnimationFrame(spinRAF);
-  const loop = t => {
+  const loop = () => {
     let busy = false;
-    if(tween){
-      const f = Math.min(1,(t-tween.t0)/tween.ms);
-      const e = f<.5 ? 2*f*f : 1-Math.pow(-2*f+2,2)/2;
-      GL.lam = tween.l0 + tween.dl*e;
-      GL.phi = tween.p0 + tween.dp*e;
-      if(tween.dz){ GL.z = tween.z0 + tween.dz*e; fitMap(); }
-      if(f>=1) tween=null; else busy = true;
+    if(CAM){
+      const dl = ((CAM.lam - GL.lam + 540) % 360) - 180;
+      const dp = CAM.phi - GL.phi, dz = CAM.z - GL.z;
+      if(Math.abs(dl) > 0.06 || Math.abs(dp) > 0.06 || Math.abs(dz) > 0.003){
+        GL.lam = ((GL.lam + dl*CAM.k) + 540) % 360 - 180;
+        GL.phi = Math.max(-78, Math.min(78, GL.phi + dp*CAM.k));
+        if(Math.abs(dz) > 0.003){ GL.z = Math.max(1, Math.min(ZMAX, GL.z + dz*CAM.k)); fitMap(); }
+        busy = true;
+      } else { CAM = null; }
     }
-    if(GL.spin && !tween){ GL.lam = (GL.lam + GL.rate + 540)%360 - 180; busy = true; }
+    if(GL.spin && !CAM && !PLAYING){ GL.lam = (GL.lam + GL.rate + 540)%360 - 180; busy = true; }
     renderMap();
     if(busy) spinRAF = requestAnimationFrame(loop);
   };
   spinRAF = requestAnimationFrame(loop);
 }
-
 
 /* which countries are lit right now */
 function setHot(ccs){
@@ -460,21 +530,6 @@ function setHot(ccs){
   if(key === hotCCs.join(',')) return;
   hotCCs = ccs.slice();
   ctyPaths.forEach(c => c.g.classList.toggle('hot', ccs.includes(c.cc)));
-  /* if nothing is flying, keep the globe pointed at where he actually is */
-  if(!tween && GL.mode==='globe'){
-    const c = ctyPaths.find(x => x.cc === ccs[0]);
-    if(c){
-      let la=0, lo=0, n=0, laMin=90, laMax=-90, loMin=180, loMax=-180;
-      for(const r of c.rings){ for(const pt of r){
-        la+=pt[0]; lo+=pt[1]; n++;
-        laMin=Math.min(laMin,pt[0]); laMax=Math.max(laMax,pt[0]);
-        loMin=Math.min(loMin,pt[1]); loMax=Math.max(loMax,pt[1]);
-      } }
-      /* Japan is 20 degrees tall on a 460px globe, i.e. nothing. Zoom to it. */
-      const span = Math.max(laMax-laMin, (loMax-loMin)*Math.cos(((laMin+laMax)/2)*R));
-      if(n) aimAt(la/n, lo/n, 1500, zForSpan(span*2.1));
-    }
-  }
 }
 
 /* floating label so you can tell where a dot is heading */
@@ -496,6 +551,7 @@ function tagMove(m){
   setTimeout(()=>{ clearInterval(iv); t.remove(); }, 2600);
 }
 
+let GRABBED = false;
 function mapControls(){
   const lg = document.querySelector('.maplegend');
   if(!lg || document.getElementById('mapBtns')) return;
@@ -519,28 +575,53 @@ function mapControls(){
   });
   autoBtn = mk('AUTO','Camera follows the action and zooms to the country', true, b=>{
     AUTOCAM = !AUTOCAM; b.classList.toggle('on', AUTOCAM);
-    if(AUTOCAM){ GL.z = 1; fitMap(); renderMap(); }
+    AUTOZOOM = AUTOCAM;
+    if(AUTOCAM){ GL.z = 1; fitMap(); renderMap(); syncMap(+$('#scrub').value); aimDay(+$('#scrub').value, 700); }
   });
   mk('＋','Zoom in', false, ()=>zoom(1.35));
   mk('－','Zoom out', false, ()=>zoom(1/1.35));
   lg.appendChild(box);
 
+  /* Nicholas 2026-11-02: this used to swallow every wheel event over the map.
+     Scrolling the page down to the player therefore zoomed the globe AND killed
+     the auto-camera, which is why it stopped following. Now the wheel only
+     zooms once you've actually grabbed the globe (or hold shift). */
   document.getElementById('map').addEventListener('wheel', e=>{
     if(GL.mode!=='globe') return;
+    if(!GRABBED && !e.shiftKey) return;            // let the page scroll
     e.preventDefault(); zoom(e.deltaY < 0 ? 1.12 : 1/1.12);
   }, {passive:false});
 
   /* drag to rotate */
   const svg = document.getElementById('map');
   let drag = null;
-  const down = e => { if(GL.mode!=='globe') return; AUTOCAM=false; if(autoBtn) autoBtn.classList.remove('on'); drag = {x:(e.touches?e.touches[0]:e).clientX, y:(e.touches?e.touches[0]:e).clientY, lam:GL.lam, phi:GL.phi}; svg.classList.add('grabbing'); };
+  /* arming the drag no longer kills the auto-camera on contact: a touch has to
+     actually travel (and travel sideways) before it counts as grabbing the globe,
+     otherwise swiping PAST the map on a phone silently turned follow-mode off. */
+  const down = e => {
+    if(GL.mode!=='globe') return;
+    const t = e.touches?e.touches[0]:e;
+    drag = { x:t.clientX, y:t.clientY, lam:GL.lam, phi:GL.phi, live:!e.touches };
+    if(drag.live) grab();
+  };
+  const grab = () => {
+    GRABBED = true; AUTOCAM = false; AUTOZOOM = false;
+    if(autoBtn) autoBtn.classList.remove('on');
+    svg.classList.add('grabbing');
+  };
   const move = e => {
     if(!drag) return;
     const t = e.touches?e.touches[0]:e;
+    const dx = t.clientX-drag.x, dy = t.clientY-drag.y;
+    if(!drag.live){
+      if(Math.hypot(dx,dy) < 8) return;            // still just a tap
+      if(Math.abs(dy) > Math.abs(dx)){ drag = null; return; }  // vertical = scroll the page
+      drag.live = true; grab();
+    }
     const k = 0.32 * (FRAME / svg.getBoundingClientRect().width) / GL.z;
-    GL.lam = ((drag.lam - (t.clientX-drag.x)*k) + 540)%360 - 180;
-    GL.phi = Math.max(-78, Math.min(78, drag.phi + (t.clientY-drag.y)*k));
-    tween = null; renderMap();
+    GL.lam = ((drag.lam - dx*k) + 540)%360 - 180;
+    GL.phi = Math.max(-78, Math.min(78, drag.phi + dy*k));
+    CAM = null; renderMap();
     if(e.cancelable) e.preventDefault();
   };
   const up = () => { drag=null; svg.classList.remove('grabbing'); };
@@ -550,7 +631,7 @@ function mapControls(){
 
 function zoom(f){
   GL.z = Math.max(1, Math.min(ZMAX, GL.z * f));
-  AUTOCAM = false; autoBtn && autoBtn.classList.remove('on');
+  AUTOZOOM = false;                 /* your zoom sticks, the camera keeps following */
   fitMap(); renderMap();
 }
 
@@ -597,6 +678,7 @@ function comet(path, type){
 let lastIdx = -1;
 function syncMap(idx, animate){
   if(!mapReady) return;
+  let flew = false;
   const upto = D.days[idx] ? D.days[idx].d : D.today;
   let f=0,c=0,r=0;
   arcs.forEach(a=>{
@@ -606,7 +688,8 @@ function syncMap(idx, animate){
       if(on && animate){
         a.el.classList.add('hot'); setTimeout(()=>a.el.classList.remove('hot'), 1400);
         const mid = gcMid(a.m.a, a.m.b);
-        aimAt(mid[0], mid[1], 900, zForSpan(angDist(a.m.a, a.m.b) * 1.45));
+        flew = true;
+        aimAt(mid[0], mid[1], 900, zForSpan(angDist(a.m.a, a.m.b) * 1.45), 'arc');
         setTimeout(()=>comet(a.el, a.m.t), 520);
         const k = a.m.b[0].toFixed(2)+','+a.m.b[1].toFixed(2);
         if(nodes[k]) ping(nodes[k].x, nodes[k].y);
@@ -620,7 +703,10 @@ function syncMap(idx, animate){
   $('#nFl').textContent=f; $('#nCr').textContent=c; $('#nRl').textContent=r;
   const d = D.days[idx];
   $('#mapNow').textContent = d ? (d.city ? d.city : (d.ccs[0] ? nameOf(d.ccs[0]) : '')) : '';
-  if(d) setHot(d.ccs || []);
+  if(d){
+    setHot(d.ccs || []);
+    if(!flew) aimDay(idx, PLAYING ? Math.max(220, speed*5) : 700);
+  }
   lastIdx = idx;
 }
 
@@ -628,10 +714,11 @@ function syncMap(idx, animate){
 let timer=null, speed=70;   // default 1x (Nicholas 2026-11-01)
 function wire(){
   const btn = $('#playBtn'), scrub = $('#scrub');
-  function stop(){ clearInterval(timer); timer=null; btn.classList.remove('playing'); btn.innerHTML='▶<span>Play the year</span>'; }
+  function stop(){ clearInterval(timer); timer=null; PLAYING=false; btn.classList.remove('playing'); btn.innerHTML='▶<span>Play the year</span>'; }
   btn.addEventListener('click',()=>{
     if(timer){ stop(); return; }
     btn.classList.add('playing'); btn.innerHTML = '❚❚<span>Pause</span>';
+    PLAYING = true;
     const END = Math.max(1, D.days.findIndex(x=>x.d===D.today));
     let i = +scrub.value;
     if(i >= END) i = 0;
