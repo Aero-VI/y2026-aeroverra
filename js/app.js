@@ -660,8 +660,11 @@ let animSeq = 0;
 function comet(path, type, dur){
   if(REDUCED) return;
   const NS='http://www.w3.org/2000/svg';
-  let len = 0; try{ len = path.getTotalLength(); }catch(e){}
-  if(!len) return;
+  /* Do NOT bail when the path has no length yet: at the instant a leg turns on
+     the camera has only just started easing toward it, so the arc is often
+     still on the BACK of the globe and the front path is empty. The old code
+     killed the glyph on frame 1 and the whole flight animated invisibly.
+     (Nicholas 2026-11-02) */
   const g = document.createElementNS(NS,'text');
   g.setAttribute('class','vehicle v-'+(type||'f'));
   g.textContent = GLYPH[type] || GLYPH.f;
@@ -674,10 +677,14 @@ function comet(path, type, dur){
   const step = t => {
     const f = Math.min(1,(t-t0)/dur);
     const e = f<.5 ? 2*f*f : 1-Math.pow(-2*f+2,2)/2;      // leave gently, arrive gently
-    let L, p, q;
+    let L = 0, p, q;
+    try{ L = path.getTotalLength(); }catch(err){ L = 0; }
+    if(!L){                                  // arc is round the back right now
+      g.setAttribute('opacity', 0);
+      if(f<1) requestAnimationFrame(step); else { g.remove(); clear(); }
+      return;
+    }
     try{
-      L = path.getTotalLength();
-      if(!L){ g.remove(); clear(); return; }
       p = path.getPointAtLength(L*e);
       q = path.getPointAtLength(Math.min(L, L*e + Math.max(1, L*0.02)));
     }catch(err){ g.remove(); clear(); return; }
