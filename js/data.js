@@ -1,6 +1,6 @@
-import { makeArc, sampleArc, km } from './geo.js?v=8';
+import { makeArc, sampleArc, km } from './geo.js?v=9';
 
-const V = '8';
+const V = '9';
 const get = p => fetch(`${p}?v=${V}`).then(r => {
   if (!r.ok) throw new Error(`${p}: HTTP ${r.status}`);
   return r.json();
@@ -41,8 +41,15 @@ function prepare(J, W, N, shapes) {
     const arc = makeArc(L.a, L.b, bulge);
     const deg = arc.rad * 57.2958;
     const ns = Math.round(Math.max(16, Math.min(200, deg * 2.2)));
+    // where the route crosses the date line, so the calendar can flip there and not before
+    let dl = null;
+    for (let k = 1, prev = arc.at(0)[1]; k <= 64 && dl == null; k++) {
+      const lon = arc.at(k / 64)[1];
+      if (Math.abs(lon - prev) > 180) dl = (k - 0.5) / 64;
+      prev = lon;
+    }
     return {
-      ...L, arc, deg, ns,
+      ...L, arc, deg, ns, dl,
       coords: sampleArc(arc, ns),
       mi: Math.round(L.km * 0.621371),
       i0: dayIdx[L.d0] ?? 0,

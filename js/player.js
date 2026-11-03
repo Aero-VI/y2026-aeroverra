@@ -2,8 +2,8 @@
 // along the sphere (pull back to see where he is going, push in on arrival), the vehicle rides the exact
 // centre of that path, and on the ground the camera settles and slowly closes in to the scale of the
 // next hop, so Japan's short train rides get room without any country-specific rules.
-import { flyCurve, slerp, arcRad, km, zoomToFit, clamp, ease, lonLat } from './geo.js?v=8';
-import { setHot, setVisited, styleLegsState } from './map.js?v=8';
+import { flyCurve, slerp, arcRad, km, zoomToFit, clamp, ease, lonLat } from './geo.js?v=9';
+import { setHot, setVisited, styleLegsState } from './map.js?v=9';
 
 const SPEEDS = [0.5, 1, 2, 4];
 const PITCH_MAX = 42;
@@ -219,7 +219,8 @@ export class Player {
       this.cam.p += (pitchFor(z) - this.cam.p) * expK(dt, 0.35);
       this.leg.f = f;
       const span = L.i1 - L.i0;
-      if (span > 0) this.setDay(Math.min(L.i1, L.i0 + Math.floor(f * (span + 1))));
+      if (span > 0 && L.t === 'f') this.setDay(L.dl != null ? (f < L.dl ? L.i0 : L.i1) : (f < 0.5 ? L.i0 : L.i1));
+      else if (span > 0) this.setDay(Math.min(L.i1, L.i0 + Math.floor(f * (span + 1))));
       this.ui.tally(this.visited.size, this.miles + miOf(L) * f, this.flights);
       if (f > 0.9 && L.bcc && L.bcc !== 'SEA') { this.arrive(); this.setHotCC(L.bcc); }
       else if (L.t === 'c' && span > 1 && f > 0.15 && f < 0.9) this.setHotCC(null);

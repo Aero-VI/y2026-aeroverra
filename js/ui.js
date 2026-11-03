@@ -1,6 +1,6 @@
 // The player's heads-up display: departure-board date, where he is, running totals, the year ribbon.
-import { fmt, dateParts, flag, MODE } from './data.js?v=8';
-import { countryColor } from './palette.js?v=8';
+import { fmt, dateParts, flag, MODE } from './data.js?v=9';
+import { countryColor } from './palette.js?v=9';
 
 const $ = id => document.getElementById(id);
 
@@ -120,6 +120,8 @@ export class PlayerUI {
 
   tally(countries, miles, flights) {
     $('tCountries').textContent = countries;
+    $('tCountries').nextElementSibling.textContent = countries === 1 ? 'country' : 'countries';
+    $('tFlights').nextElementSibling.textContent = flights === 1 ? 'flight' : 'flights';
     $('tMiles').textContent = fmt(miles);
     $('tFlights').textContent = flights;
   }

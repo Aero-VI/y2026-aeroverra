@@ -1,9 +1,9 @@
-import { loadAll } from './data.js?v=8';
-import { createMap, addLayers } from './map.js?v=8';
-import { Overlay } from './overlay.js?v=8';
-import { Story } from './story.js?v=8';
-import { Player } from './player.js?v=8';
-import { PlayerUI } from './ui.js?v=8';
+import { loadAll } from './data.js?v=9';
+import { createMap, addLayers } from './map.js?v=9';
+import { Overlay } from './overlay.js?v=9';
+import { Story } from './story.js?v=9';
+import { Player } from './player.js?v=9';
+import { PlayerUI } from './ui.js?v=9';
 
 const body = document.body;
 const fail = msg => {
