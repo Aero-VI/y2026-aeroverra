@@ -9,6 +9,8 @@ const SPEEDS = [0.5, 1, 2, 4];
 const PITCH_MAX = 42;
 const pitchFor = z => clamp((z - 4.2) / 3.6, 0, 1) ** 1.4 * PITCH_MAX;
 const expK = (dt, tau) => 1 - Math.exp(-dt / tau);
+// dotted "not recorded" hops are drawn but never counted, so the tally ends on the verified total
+const miOf = L => (L.t === 'g' ? 0 : L.km * 0.621371);
 
 function buildBeats(A) {
   const beats = [];
@@ -58,6 +60,7 @@ export class Player {
 
   reset() {
     this.bi = 0; this.t = 0;
+    this.pendingCC = null;
     this.miles = 0; this.flights = 0;
     this.visited = new Set();
     this.day = -1;
@@ -139,7 +142,9 @@ export class Player {
   legDuration(L, S) {
     const mode = { f: 1, c: 1.15, r: 0.9, b: 0.9, g: 0.65 }[L.t] || 1;
     const seaDays = L.t === 'c' ? Math.max(0, L.i1 - L.i0 - 1) * 0.16 : 0;
-    return clamp((0.45 + 0.7 * S + 0.85 * Math.log1p(L.km / 500)) * mode + seaDays, 0.9, 7.5);
+    const travel = (0.45 + 0.7 * S + 0.85 * Math.log1p(L.km / 500)) * mode + seaDays;
+    // never faster than the camera can comfortably change scale (a short hop into a big zoom-out)
+    return clamp(Math.max(travel, 0.55 + 0.8 * S), 0.9, 7.5);
   }
 
   // ---------------------------------------------------------------- the clock
@@ -191,14 +196,15 @@ export class Player {
       this.leg = { L, f: 0 };
       this.ov.here = null;
       this.ui.leg(L);
+      // the country at the far end only counts once he gets there
+      this.pendingCC = L.bcc !== L.acc ? L.bcc : null;
       this.setDay(Math.max(b.day, L.i0));
-    } else if (b.kind === 'pause') {
-      b.dur = b.port ? 0.45 : 0.25;
-      this.ui.leg(null);
     } else {
-      b.dur = b.run < 3 ? 0.24 : 0.085;
-      this.ui.leg(null);
+      b.dur = b.kind === 'pause' ? (b.port ? 0.45 : 0.25) : (b.run < 3 ? 0.24 : 0.085);
       this.setDay(b.day);
+      const d = A.days[b.day];
+      if (b.kind === 'pause') this.ui.place({ ...d, city: b.L.bc, ccs: d.ccs || [] }, b.L.bcc !== 'SEA' ? b.L.bcc : null);
+      else this.ui.place(d, this.hotFor(b.day));
     }
   }
 
@@ -209,12 +215,13 @@ export class Player {
       const { u, z } = P.curve.at(k);
       const f = P.near ? clamp(u, 0, 1) : k;
       const c = slerp(P.c0, L.b, clamp(u, 0, 1));
-      this.cam.c = c; this.cam.z = z; this.cam.p = pitchFor(z);
+      this.cam.c = c; this.cam.z = z;
+      this.cam.p += (pitchFor(z) - this.cam.p) * expK(dt, 0.35);
       this.leg.f = f;
       const span = L.i1 - L.i0;
       if (span > 0) this.setDay(Math.min(L.i1, L.i0 + Math.floor(f * (span + 1))));
-      this.ui.tally(this.visited.size, this.miles + L.mi * f, this.flights);
-      if (f > 0.9 && L.bcc && L.bcc !== 'SEA') this.setHotCC(L.bcc);
+      this.ui.tally(this.visited.size, this.miles + miOf(L) * f, this.flights);
+      if (f > 0.9 && L.bcc && L.bcc !== 'SEA') { this.arrive(); this.setHotCC(L.bcc); }
       else if (L.t === 'c' && span > 1 && f > 0.15 && f < 0.9) this.setHotCC(null);
     } else {
       const p = this.A.days[b.day].p;
@@ -224,8 +231,9 @@ export class Player {
 
   exit(b) {
     if (b.kind !== 'leg') return;
+    this.arrive();
     const L = b.L;
-    this.miles += L.mi;
+    this.miles += miOf(L);
     if (L.t === 'f') this.flights++;
     this.zStay = this.stayZoom(L);
     this.fading.push({ L, f: 1, alpha: 1 });
@@ -242,6 +250,21 @@ export class Player {
     c.p += (pitchFor(c.z) - c.p) * expK(dt, 0.8);
   }
 
+  visit(cc, announce) {
+    if (!cc || cc === 'SEA' || this.visited.has(cc)) return;
+    this.visited.add(cc);
+    setVisited(this.map, this.A, this.visited);
+    if (announce && this.playing) this.ui.toast(cc, this.A.names[cc], this.visited.size, this.newEver.has(cc));
+  }
+
+  arrive() {
+    if (!this.pendingCC) return;
+    const cc = this.pendingCC;
+    this.pendingCC = null;
+    this.visit(cc, true);
+    this.ui.tally(this.visited.size, this.miles + (this.leg ? miOf(this.leg.L) * this.leg.f : 0), this.flights);
+  }
+
   setDay(i) {
     if (i === this.day) return;
     const A = this.A;
@@ -250,12 +273,7 @@ export class Player {
     const d = A.days[i];
     // countries reached on every day between the last tick and this one
     for (let k = Math.max(0, from + 1); k <= i; k++) {
-      for (const cc of A.days[k].ccs || []) {
-        if (cc === 'SEA' || this.visited.has(cc)) continue;
-        this.visited.add(cc);
-        setVisited(this.map, A, this.visited);
-        if (k > 0 && this.playing) this.ui.toast(cc, A.names[cc], this.visited.size, this.newEver.has(cc));
-      }
+      for (const cc of A.days[k].ccs || []) if (cc !== this.pendingCC) this.visit(cc, k > 0);
     }
     this.ui.date(d.d);
     if (!this.leg) {
@@ -313,7 +331,7 @@ export class Player {
     let lastLeg = null;
     for (let k = 0; k < bi; k++) {
       const b = this.beats[k];
-      if (b.kind === 'leg') { this.miles += b.L.mi; if (b.L.t === 'f') this.flights++; lastLeg = b.L; }
+      if (b.kind === 'leg') { this.miles += miOf(b.L); if (b.L.t === 'f') this.flights++; lastLeg = b.L; }
     }
     this.bi = bi;
     this.day = -1;

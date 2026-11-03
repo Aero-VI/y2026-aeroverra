@@ -106,7 +106,7 @@ export class PlayerUI {
       $('pLeg').textContent = 'At sea';
     } else if (cc) {
       const n = this.cum[cc]?.[day.i] || 0;
-      $('pLeg').innerHTML = `${flag(cc)} ${esc(country)}<span class="sep"></span>, day ${n} of the year there`;
+      $('pLeg').innerHTML = n ? `${flag(cc)} ${esc(country)}, day ${n} there this year` : `${flag(cc)} ${esc(country)}`;
     } else $('pLeg').textContent = '';
   }
 

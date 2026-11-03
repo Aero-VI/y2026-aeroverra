@@ -64,7 +64,7 @@ a { color: inherit; }
 .maplibregl-ctrl-attrib a { color: var(--ink-2); }
 .maplibregl-ctrl-attrib-button { filter: invert(0.85); }
 .is-player .maplibregl-ctrl-bottom-right { bottom: var(--deck-h, 96px); }
-@media (max-width: 760px) { .is-player .maplibregl-ctrl-bottom-right { bottom: calc(var(--deck-h, 120px) + 62px); } }
+@media (max-width: 760px) { .is-player .maplibregl-ctrl-bottom-right { bottom: auto; top: 76px; } }
 
 .scrim {
   position: fixed; inset: 0; z-index: 1; pointer-events: none;
@@ -238,7 +238,8 @@ a { color: inherit; }
   display: flex; gap: 26px; pointer-events: none !important;
 }
 .tally div { display: grid; justify-items: end; }
-.tally b { font: 800 30px/1 var(--display); font-variant-numeric: tabular-nums; }
+.tally b { font: 800 30px/1 var(--display); font-variant-numeric: tabular-nums; text-shadow: 0 2px 14px rgba(7, 13, 34, 0.95); }
+.tally span { text-shadow: 0 1px 8px rgba(7, 13, 34, 1); }
 .tally span { font-size: 13px; color: var(--ink-3); }
 .close { position: absolute; top: max(18px, env(safe-area-inset-top)); right: var(--gutter); padding: 0 16px 0 12px; }
 .close svg { width: 18px; height: 18px; stroke: currentColor; stroke-width: 2; }

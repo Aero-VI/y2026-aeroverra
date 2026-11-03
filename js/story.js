@@ -266,7 +266,7 @@ export function chapters(A) {
       legs: { all: 0.7 },
       html: `
         <h2 class="hero-title">Watch it happen</h2>
-        <p class="lede">All ${legs.length} legs in order, with the camera riding along. About four minutes at normal speed, and you can scrub to any day.</p>
+        <p class="lede">All ${legs.length} legs in order, with the camera riding along. About four and a half minutes at normal speed, and you can scrub to any day.</p>
         <div class="hero-acts"><button class="btn btn-solid" type="button" data-act="play">Play the year</button></div>
         <p class="method">Built from his booking confirmations: every flight, train, bus, cruise and hotel. A day counts for each country he set foot in. Dotted lines are hops with no ticket on file, like a drive or a local train. Distances are great circles. Updated ${longDate(A.today)}, 2026.<br><br>Map © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, <a href="https://openmaptiles.org">OpenMapTiles</a>, served by <a href="https://openfreemap.org">OpenFreeMap</a>. Terrain from Mapzen on AWS Open Data. Borders from Natural Earth.</p>`,
     },
