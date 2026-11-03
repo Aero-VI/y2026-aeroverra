@@ -1,10 +1,10 @@
-import { loadAll } from './data.js?v=11';
-import { createMap, addLayers } from './map.js?v=11';
-import { Overlay } from './overlay.js?v=11';
-import { Story } from './story.js?v=11';
-import { Player } from './player.js?v=11';
-import { PlayerUI } from './ui.js?v=11';
-import { Sound } from './audio.js?v=11';
+import { loadAll } from './data.js?v=12';
+import { createMap, addLayers } from './map.js?v=12';
+import { Overlay } from './overlay.js?v=12';
+import { Story } from './story.js?v=12';
+import { Player } from './player.js?v=12';
+import { PlayerUI } from './ui.js?v=12';
+import { Sound } from './audio.js?v=12';
 
 const body = document.body;
 const fail = msg => {
@@ -27,14 +27,18 @@ async function boot() {
   const sound = new Sound();
   const ui = new PlayerUI(A);
   ui.onFlip = () => sound.flap();
+  ui.onMonth = () => sound.month();
   const player = new Player(map, ov, A, ui, sound);
   const story = new Story(map, ov, A, day => openPlayer(day), sound);
   body.classList.remove('is-loading');
   map.getContainer().classList.add('is-ready');
 
+  // Play and Watch the story always bring the music in, even after an earlier mute
+  const soundOn = () => { if (!sound.on) sound.toggle(); else sound.unlock(); paintSound(); };
+
   function openPlayer(day = 0) {
     story.stopAuto();
-    sound.unlock();
+    soundOn();
     story.suspended = true;
     player.start(day);
     history.replaceState(null, '', `#play${day ? `-${A.days[day].d}` : ''}`);
@@ -76,7 +80,7 @@ async function boot() {
     if (!b) return;
     const act = b.dataset.act;
     if (act === 'play') openPlayer(0);
-    else if (act === 'auto') { sound.unlock(); story.toggleAuto(); sound.intensity(story.auto ? 0.4 : 0.3); paintSound(); }
+    else if (act === 'auto') { if (!story.auto) soundOn(); story.toggleAuto(); sound.intensity(story.auto ? 0.4 : 0.3); paintSound(); }
     else if (act === 'sound') {
       if (sound.on && !live()) sound.unlock();
       else sound.toggle();

@@ -30,17 +30,31 @@ export class Sound {
   /** Call from a click/keypress: browsers only let audio start inside a user gesture. */
   unlock() {
     if (!this.on) return;
+    this.mediaSession();
     if (!this.ctx) this.build();
     if (this.ctx.state === 'suspended') this.ctx.resume();
     this.fade(1, 1.6);
     if (!this.timer) this.startScore();
   }
 
+  /**
+   * iPhones play web audio through the ringer channel, so the silent switch mutes it. Declaring playback
+   * (and starting a silent media element, for older iOS) puts it on the media channel like a video.
+   */
+  mediaSession() {
+    if (this.media) return;
+    try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) { /* not supported */ }
+    const a = this.media = document.createElement('audio');
+    a.setAttribute('playsinline', ''); a.loop = true; a.volume = 0.01;
+    a.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAAAA';
+    a.play().catch(() => { /* fine: Web Audio still plays where the switch allows */ });
+  }
+
   toggle() {
     this.on = !this.on;
     try { localStorage.setItem(KEY, this.on ? 'on' : 'off'); } catch (e) { /* ignore */ }
-    if (this.on) this.unlock();
-    else this.fade(0, 0.5);
+    if (this.on) { this.unlock(); if (this.media) this.media.play().catch(() => {}); }
+    else { this.fade(0, 0.5); if (this.media) this.media.pause(); }
     this.emit();
   }
 
@@ -260,6 +274,12 @@ export class Sound {
     g.gain.setValueAtTime(vol, at); g.gain.exponentialRampToValueAtTime(0.0001, at + 0.03);
     src.connect(f).connect(g).connect(this.master);
     src.start(at, Math.random()); src.stop(at + 0.04);
+  }
+
+  /** A new month on the board: one low, soft bell under the score. */
+  month() {
+    if (!this.ready()) return;
+    this.bell(NOTE(62), this.ctx.currentTime + 0.02, 0.09, this.sfx);
   }
 
   /** A chapter change in the story: a short airy swell. */

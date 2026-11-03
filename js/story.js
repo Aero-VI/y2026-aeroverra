@@ -1,8 +1,8 @@
 // The story: one chapter per screen, each with its own camera move on the globe behind it.
-import { fmt, flag, longDate, dateParts } from './data.js?v=11';
-import { setHot, setVisited, setLit, styleLegsState } from './map.js?v=11';
-import { countryColor, TAIL } from './palette.js?v=11';
-import { slerp, clamp, smooth as smoothstep } from './geo.js?v=11';
+import { fmt, flag, longDate, dateParts } from './data.js?v=12';
+import { setHot, setVisited, setLit, styleLegsState } from './map.js?v=12';
+import { countryColor, TAIL } from './palette.js?v=12';
+import { slerp, clamp, smooth as smoothstep } from './geo.js?v=12';
 
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const phone = () => window.innerWidth <= 760;
@@ -64,7 +64,7 @@ export function chapters(A) {
         ${stat(W.countries, 'countries')}
         <p class="lede">${W.countries_nonus} outside the US, and <strong>${firstEver.size} of them for the first time</strong>, from Australia in January to Gibraltar in October. Territories count on their own.</p>
         <ul class="viz flags">${A.countries.slice().sort((a, b) => b.days - a.days).map(c => `
-          <li class="${firstEver.has(c.cc) ? 'new' : ''}" title="${esc(c.name)}"><span class="f" aria-hidden="true">${flag(c.cc)}</span><b>${c.cc}</b>${c.days} ${c.days === 1 ? 'day' : 'days'}</li>`).join('')}
+          <li class="${firstEver.has(c.cc) ? 'new' : ''}" title="${esc(c.name)}"><span class="f" aria-hidden="true">${flag(c.cc)}</span><b>${c.cc}</b><span class="d">${c.days} ${c.days === 1 ? 'day' : 'days'}</span></li>`).join('')}
         </ul>
         <p class="key"><i></i>First time ever</p>`,
     },
@@ -338,6 +338,7 @@ export class Story {
     if (body) body.scrollTop = 0;
     this.root.scrollTop = 0;
     document.body.classList.toggle('is-scrolled', i > 0);
+    this.fit(i);
     this.activate(this.list[i].id);
     document.querySelectorAll('.ch').forEach((s, k) => { s.inert = k !== i; s.setAttribute('aria-hidden', String(k !== i)); });
   }
@@ -345,6 +346,20 @@ export class Story {
   goId(id, animate = true) {
     const i = this.list.findIndex(c => c.id === id);
     if (i >= 0) this.go(i, animate);
+  }
+
+  /**
+   * Phones: a chapter must fit one screen (one swipe = one slide), so text that would still overflow is
+   * scaled down a little, never below 80%.
+   */
+  fit(i) {
+    const b = this.bodyOf(i);
+    if (!b) return;
+    b.style.zoom = '';
+    if (!phone()) return;
+    const sec = b.parentElement, cs = getComputedStyle(sec);
+    const room = sec.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+    if (b.scrollHeight > room + 1) b.style.zoom = String(Math.max(0.8, room / b.scrollHeight));
   }
 
   bodyOf(i = this.index) { return this.pages.children[i]?.querySelector('.ch-body'); }
@@ -385,7 +400,16 @@ export class Story {
       const push = mag > 28 && mag > lastMag * 1.8;
       if (fresh) { acc = 0; spent = false; if (mag > 4) this.userMoved(); }
       lastT = t; lastMag = mag;
-      if (this.canScroll(Math.sign(dy)) && t >= this.lock && !spent) { innerT = t; return; }
+      if (this.canScroll(Math.sign(dy)) && t >= this.lock && !spent) {
+        // The chapter's text is taller than the screen. Over the text the browser scrolls it; anywhere
+        // else (the globe) nothing would move, so scroll it from here.
+        innerT = t;
+        const b = this.bodyOf();
+        if (b.contains(e.target)) return;
+        e.preventDefault();
+        b.scrollBy({ top: dy, behavior: Math.abs(dy) >= 50 ? 'smooth' : 'auto' });
+        return;
+      }
       e.preventDefault();
       if (spent && !push) return;
       if (t < this.lock || t - innerT < 350) return;
@@ -419,6 +443,7 @@ export class Story {
 
     // focus (Tab) or a #chapter link lands on the right page, never on a half-way scroll offset
     this.root.addEventListener('scroll', () => { this.root.scrollTop = 0; });
+    window.addEventListener('resize', () => this.fit(this.index));
     window.addEventListener('scroll', () => { if (window.scrollY) window.scrollTo(0, 0); });
     this.root.addEventListener('focusin', e => {
       const sec = e.target.closest('.ch');
@@ -479,10 +504,20 @@ export class Story {
 
   padding(ch) {
     const W = window.innerWidth, H = window.innerHeight;
-    if (phone()) return { top: 64, bottom: Math.round(H * (ch.id === 'hero' ? 0.42 : 0.5)), left: 0, right: 0 };
+    if (phone()) {
+      // the globe sits in whatever height the chapter's text leaves free (at least a third of the screen)
+      const textH = this.textHeight(ch);
+      return { top: 64, bottom: Math.round(Math.min(H * 0.66, Math.max(H * 0.4, textH + 24))), left: 0, right: 0 };
+    }
     if (ch.pad === 'hero') return { top: 40, bottom: Math.round(H * 0.12), left: Math.round(W * 0.42), right: 0 };
     const col = Math.min(560, W * 0.44) + Math.min(56, W * 0.04);
     return { top: 70, bottom: 40, left: Math.round(col + 24), right: 24 };
+  }
+
+  textHeight(ch) {
+    const sec = document.getElementById(ch.id);
+    const b = sec && sec.querySelector('.ch-body');
+    return b ? b.scrollHeight + 24 : window.innerHeight * 0.5;
   }
 
   /** Chapter zooms are written for a 700px view; scale to the room actually left beside the text. */
@@ -525,6 +560,7 @@ export class Story {
     if (ch.next) this.ov.pins = ch.next.slice(ch.nowIdx).map((e, k) => ({ p: e.p, label: k === 0 ? `${e.city}, now` : e.city }));
     this.ov.legs = []; this.ov.vehicle = null; this.ov.here = null;
     document.querySelector('.scrim').classList.toggle('is-heavy', !!ch.heavy);
+    document.documentElement.style.setProperty('--text-h', `${Math.round(this.textHeight(ch))}px`);
     m.triggerRepaint();
   }
 

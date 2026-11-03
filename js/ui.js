@@ -1,6 +1,6 @@
 // The player's heads-up display: departure-board date, where he is, running totals, the year ribbon.
-import { fmt, dateParts, flag, MODE } from './data.js?v=11';
-import { countryColor } from './palette.js?v=11';
+import { fmt, dateParts, flag, MODE } from './data.js?v=12';
+import { countryColor } from './palette.js?v=12';
 
 const $ = id => document.getElementById(id);
 
@@ -97,6 +97,16 @@ export class PlayerUI {
   date(iso) {
     const p = dateParts(iso);
     this.flaps.set([p.wd.toUpperCase(), String(p.d).padStart(2, '0'), p.mon.toUpperCase()]);
+    // the month is its own amber block on the board, and it lights up when it turns over
+    const grp = this.flaps.el.children[2];
+    if (grp) {
+      grp.classList.add('is-month');
+      if (this.lastMonth != null && p.m !== this.lastMonth) {
+        grp.classList.remove('is-new'); void grp.offsetWidth; grp.classList.add('is-new');
+        if (this.onMonth) this.onMonth();
+      }
+    }
+    this.lastMonth = p.m;
   }
 
   place(day, cc) {

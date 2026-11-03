@@ -157,8 +157,8 @@ a { color: inherit; }
 .ch + .ch { margin-top: 0; }
 
 .stat { margin: 0 0 18px; font-family: var(--display); font-weight: 900; line-height: 0.84; letter-spacing: -0.005em; }
-.stat .n { display: block; font-size: clamp(84px, 11.5vw, 190px); color: var(--ink); font-variant-numeric: lining-nums; }
-.stat .u { display: block; margin-top: 8px; font-size: clamp(30px, 3.6vw, 54px); font-weight: 800; color: var(--amber); }
+.stat .n { display: block; font-size: clamp(64px, min(11.5vw, 19vh), 190px); color: var(--ink); font-variant-numeric: lining-nums; }
+.stat .u { display: block; margin-top: 8px; font-size: clamp(28px, min(3.6vw, 6vh), 54px); font-weight: 800; color: var(--amber); }
 .lede { margin: 0 0 26px; max-width: 34ch; font-size: clamp(18px, 1.45vw, 21px); color: var(--ink-2); }
 .lede strong { color: var(--ink); font-weight: 600; }
 
@@ -269,6 +269,15 @@ a { color: inherit; }
 }
 .flaps .cell::after { content: ''; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: rgba(0, 0, 0, 0.55); }
 .flaps .cell.flip { animation: flap 0.26s cubic-bezier(0.3, 0, 0.3, 1); }
+.flaps .is-month { margin-left: 4px; padding-left: 10px; border-left: 2px solid rgba(255, 181, 71, 0.55); }
+.flaps .is-month .cell { color: var(--amber); background: linear-gradient(#2a2440 0 49.5%, #221d36 50.5% 100%); box-shadow: inset 0 0 0 1px rgba(255, 181, 71, 0.35), 0 2px 6px rgba(0, 0, 0, 0.4); }
+.flaps .is-month.is-new .cell { animation: month-glow 1.4s ease-out; }
+@keyframes month-glow {
+  0% { box-shadow: inset 0 0 0 1px rgba(255, 181, 71, 0.35), 0 0 0 0 rgba(255, 181, 71, 0); }
+  20% { box-shadow: inset 0 0 0 1px rgba(255, 210, 140, 0.95), 0 0 22px 4px rgba(255, 181, 71, 0.55); color: #fff3dc; }
+  100% { box-shadow: inset 0 0 0 1px rgba(255, 181, 71, 0.35), 0 0 0 0 rgba(255, 181, 71, 0); }
+}
+@media (prefers-reduced-motion: reduce) { .flaps .is-month.is-new .cell { animation: none; } }
 @keyframes flap { 0% { transform: rotateX(0); } 45% { transform: rotateX(-88deg); filter: brightness(0.6); } 100% { transform: rotateX(0); } }
 @media (prefers-reduced-motion: reduce) { .flaps .cell.flip { animation: none; } }
 .place { margin: 12px 0 0; font: 800 clamp(30px, 3.4vw, 46px)/1 var(--display); text-shadow: 0 2px 18px rgba(7, 13, 34, 0.9); }
@@ -348,17 +357,64 @@ a { color: inherit; }
 .is-film .tally { right: var(--gutter); }
 .is-film .masthead .mast-play { display: none; }
 
+/* shorter phones (iPhone SE and the like): tighter type so a chapter still fits one screen */
+@media (max-width: 760px) and (max-height: 780px) {
+  .ch { padding-top: 70px; }
+  .stat { margin-bottom: 10px; }
+  .stat .n { font-size: clamp(56px, 11.5vh, 100px); }
+  .stat .u { font-size: clamp(22px, 4.2vh, 30px); margin-top: 4px; }
+  .lede { font-size: 15px; line-height: 1.45; margin-bottom: 14px; }
+  .hero-title { font-size: clamp(60px, 12vh, 96px); margin-bottom: 14px; }
+  .hero-name { margin-bottom: 6px; }
+  .asof { margin-top: 12px; }
+  .flags { grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: 6px 4px; }
+  .flags .f { font-size: 20px; }
+  .flags li { font-size: 11px; }
+  .key { margin-top: 8px; font-size: 13px; }
+  .legs li { padding: 6px 0; font-size: 14px; gap: 10px; }
+  .legs .code { font-size: 17px; }
+  .ahead li { padding: 8px 0; }
+  .ahead .where { font-size: 21px; }
+  .ahead .what { font-size: 13px; margin-top: 2px; }
+  .meet { margin-top: 12px; font-size: 14px; }
+  .bars { gap: 4px; }
+  .bars li { font-size: 13px; }
+  .split-legend { margin-top: 8px; font-size: 14px; }
+  .compass { gap: 10px 16px; }
+  .compass .p { font-size: 24px; }
+  .method { margin-top: 18px; font-size: 12px; }
+  .stops { gap: 5px; }
+  .stops li { padding: 4px 9px; font-size: 13px; }
+}
+
 /* ------------------------------------------------------------------ boot */
 .is-loading #story .ch:not(.hero) { visibility: hidden; }
 .boot-error { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 50; margin: 0; padding: 12px 18px; border-radius: 12px; background: #2a1020; color: #ffd0d0; font-size: 15px; }
 .noscript { position: fixed; inset: auto 16px 16px; z-index: 50; padding: 14px; background: var(--space-2); }
 
+/* short laptop screens: give the text more of the height so most chapters fit without scrolling */
+@media (min-width: 761px) and (max-height: 820px) {
+  .ch { padding-top: 88px; padding-bottom: 40px; }
+  .stat { margin-bottom: 12px; }
+  .lede { margin-bottom: 18px; font-size: 17px; }
+  .flags { gap: 6px 8px; grid-template-columns: repeat(auto-fill, minmax(54px, 1fr)); max-width: 560px; }
+  .flags .f { font-size: 24px; }
+  .finale .hero-title { font-size: clamp(56px, min(8vw, 15vh), 120px); }
+  .method { margin-top: 22px; font-size: 13px; }
+  .bars { gap: 5px; }
+  .legs li { padding: 8px 0; }
+  .cal { gap: 3px; }
+}
+
 /* ------------------------------------------------------------------ phones */
 @media (max-width: 760px) {
   :root { --col: 100%; }
   body { font-size: 17px; }
-  .scrim { background: linear-gradient(to top, rgba(7, 13, 34, 0.96) 0%, rgba(7, 13, 34, 0.86) 40%, rgba(7, 13, 34, 0) 64%); }
-  .ch { justify-content: flex-end; padding: 44dvh 16px max(28px, env(safe-area-inset-bottom)); }
+  /* the scrim rises with the chapter's text (--text-h is set per chapter) */
+  .scrim { background: linear-gradient(to top, rgba(7, 13, 34, 0.96) 0%, rgba(7, 13, 34, 0.86) calc(var(--text-h, 40vh) - 20px), rgba(7, 13, 34, 0) calc(var(--text-h, 40vh) + 90px)); transition: opacity 0.6s ease, background 0.6s ease; }
+  /* every chapter fits one screen, so one swipe is always one slide: a long chapter simply takes more of
+     the height and the globe moves up to stay in view above it */
+  .ch { justify-content: flex-end; padding: 76px 16px max(24px, env(safe-area-inset-bottom)); }
   .hero { padding-top: 38dvh; padding-bottom: 40px; }
   .ch-body { mask-image: linear-gradient(to bottom, transparent 0, #000 18px, #000 calc(100% - 18px), transparent 100%); padding-top: 14px; padding-bottom: 14px; }
   .stat .n { font-size: clamp(72px, 22vw, 120px); }
@@ -367,6 +423,7 @@ a { color: inherit; }
   .flags { grid-template-columns: repeat(auto-fill, minmax(54px, 1fr)); gap: 8px 6px; }
   .flags .f { font-size: 24px; }
   .flags li { font-size: 12px; white-space: nowrap; }
+  .flags b { display: none; }
   .legs .code { font-size: 19px; min-width: 4em; }
   .legs li { font-size: 15px; }
   .cal-row { grid-template-columns: 2.1em 1fr; gap: 6px; }
