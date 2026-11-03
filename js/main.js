@@ -1,9 +1,9 @@
-import { loadAll } from './data.js';
-import { createMap, addLayers } from './map.js';
-import { Overlay } from './overlay.js';
-import { Story } from './story.js';
-import { Player } from './player.js';
-import { PlayerUI } from './ui.js';
+import { loadAll } from './data.js?v=8';
+import { createMap, addLayers } from './map.js?v=8';
+import { Overlay } from './overlay.js?v=8';
+import { Story } from './story.js?v=8';
+import { Player } from './player.js?v=8';
+import { PlayerUI } from './ui.js?v=8';
 
 const body = document.body;
 const fail = msg => {
@@ -27,6 +27,7 @@ async function boot() {
   const player = new Player(map, ov, A, ui);
   const story = new Story(map, ov, A, day => openPlayer(day));
   body.classList.remove('is-loading');
+  map.getContainer().classList.add('is-ready');
 
   function openPlayer(day = 0) {
     story.suspended = true;
@@ -83,7 +84,9 @@ async function boot() {
   });
   const h = playHash();
   const q = new URLSearchParams(location.search);
-  if (h || q.has('play')) {
+  // ?film: the player with no controls, for screen-recording the year as a video
+  if (q.has('film')) body.classList.add('is-film');
+  if (h || q.has('play') || q.has('film')) {
     openPlayer(dayOf((h && h[1]) || q.get('day')));
   } else {
     const id = location.hash.slice(1);

@@ -106,7 +106,7 @@ function style() {
           'text-transform': 'uppercase',
           'text-max-width': 7,
         },
-        paint: { 'text-color': C.label, 'text-opacity': ['interpolate', ['linear'], ['zoom'], 1.5, 0, 2.5, 0.7], 'text-halo-color': C.space, 'text-halo-width': 1.2 },
+        paint: { 'text-color': C.label, 'text-opacity': ['interpolate', ['linear'], ['zoom'], 2.1, 0, 2.9, 0.7], 'text-halo-color': C.space, 'text-halo-width': 1.2 },
       },
       {
         id: 'city-labels', type: 'symbol', source: 'omt', 'source-layer': 'place', minzoom: 5,

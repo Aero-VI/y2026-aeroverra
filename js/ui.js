@@ -1,6 +1,6 @@
 // The player's heads-up display: departure-board date, where he is, running totals, the year ribbon.
-import { fmt, dateParts, flag, MODE } from './data.js';
-import { countryColor } from './palette.js';
+import { fmt, dateParts, flag, MODE } from './data.js?v=8';
+import { countryColor } from './palette.js?v=8';
 
 const $ = id => document.getElementById(id);
 
@@ -101,7 +101,7 @@ export class PlayerUI {
     if (!day.ccs) return;
     const name = day.city || A.names[cc] || '';
     const country = cc && day.city !== 'At sea' ? A.names[cc] : '';
-    $('pPlace').innerHTML = `${esc(name)}`;
+    $('pPlace').textContent = short(name);
     if (day.city === 'At sea') {
       $('pLeg').textContent = 'At sea';
     } else if (cc) {

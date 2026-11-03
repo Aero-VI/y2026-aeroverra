@@ -1,8 +1,8 @@
 // The story: one chapter per screen, each with its own camera move on the globe behind it.
-import { fmt, flag, longDate, dateParts } from './data.js';
-import { setHot, setVisited, setLit, styleLegsState } from './map.js';
-import { countryColor, TAIL } from './palette.js';
-import { slerp, clamp } from './geo.js';
+import { fmt, flag, longDate, dateParts } from './data.js?v=8';
+import { setHot, setVisited, setLit, styleLegsState } from './map.js?v=8';
+import { countryColor, TAIL } from './palette.js?v=8';
+import { slerp, clamp } from './geo.js?v=8';
 
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const phone = () => window.innerWidth <= 760;
@@ -141,7 +141,7 @@ export function chapters(A) {
       html: `
         ${stat(W.cruise_nights, 'nights on ships')}
         <p class="lede">${W.cruises} cruises and ${W.port_calls} port calls: the Great Barrier Reef, Darwin to Bali, the Baltic, Alaska's Inside Passage, and the Atlantic twice.</p>
-        <ul class="viz legs ships">${W.ships.map(s => `
+        <ul class="viz legs ships">${W.ships.slice().sort((a, b) => a.start.localeCompare(b.start)).map(s => `
           <li><span class="code">${esc(s.ship.replace(/^Carnival /, ''))}</span><span>${esc(shortPort(s.frm))} to ${esc(shortPort(s.to))}</span><span class="v">${s.nights} nights</span></li>`).join('')}
         </ul>`,
     },
@@ -313,7 +313,7 @@ export class Story {
   padding(ch) {
     const W = window.innerWidth, H = window.innerHeight;
     if (phone()) return { top: 64, bottom: Math.round(H * (ch.id === 'hero' ? 0.42 : 0.5)), left: 0, right: 0 };
-    if (ch.pad === 'hero') return { top: 40, bottom: Math.round(H * 0.12), left: Math.round(W * 0.36), right: 0 };
+    if (ch.pad === 'hero') return { top: 40, bottom: Math.round(H * 0.12), left: Math.round(W * 0.42), right: 0 };
     const col = Math.min(560, W * 0.44) + Math.min(56, W * 0.04);
     return { top: 70, bottom: 40, left: Math.round(col + 24), right: 24 };
   }
