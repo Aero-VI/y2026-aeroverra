@@ -180,7 +180,7 @@ export class Player {
   /** Paused: the camera still finishes settling so a scrub or a pause never freezes mid-swing. */
   settle(dt) {
     const b = this.beats[Math.min(this.bi, this.beats.length - 1)];
-    if (b && b.kind !== 'leg') this.creep(dt, this.A.days[b.day].p, this.zStay);
+    if (b && b.kind !== 'leg') { const [p, z] = this.groundView(b); this.creep(dt, p, z); }
   }
 
   enter(b) {
@@ -224,9 +224,15 @@ export class Player {
       if (f > 0.9 && L.bcc && L.bcc !== 'SEA') { this.arrive(); this.setHotCC(L.bcc); }
       else if (L.t === 'c' && span > 1 && f > 0.15 && f < 0.9) this.setHotCC(null);
     } else {
-      const p = this.A.days[b.day].p;
-      this.creep(dt, p, this.zStay);
+      // a connection holds at the airport, wide; a port call or a day on the ground settles in
+      const [p, z] = this.groundView(b);
+      this.creep(dt, p, z);
     }
+  }
+
+  groundView(b) {
+    if (b.kind === 'pause') return [b.L.b, b.port ? this.zStay : this.cam.z];
+    return [this.A.days[b.day].p, this.zStay];
   }
 
   exit(b) {
