@@ -1,8 +1,8 @@
 // The story: one chapter per screen, each with its own camera move on the globe behind it.
-import { fmt, flag, longDate, dateParts } from './data.js?v=13';
-import { setHot, setVisited, setLit, styleLegsState } from './map.js?v=13';
-import { countryColor, TAIL } from './palette.js?v=13';
-import { slerp, clamp, smooth as smoothstep } from './geo.js?v=13';
+import { fmt, flag, longDate, dateParts } from './data.js?v=14';
+import { setHot, setVisited, setLit, styleLegsState } from './map.js?v=14';
+import { countryColor, TAIL } from './palette.js?v=14';
+import { slerp, clamp, smooth as smoothstep } from './geo.js?v=14';
 
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const phone = () => window.innerWidth <= 760;
@@ -441,7 +441,9 @@ export class Story {
       y0 = null;
       const swiped = Math.abs(dy) > 48 || (Math.abs(dy) > 22 && dt < 250);
       if (swiped || inner) this.userMoved();
-      if (inner || now() < this.lock) return;
+      if (inner) return;
+      // every swipe counts, even one made while the last page is still sliding in: two quick swipes are
+      // two pages (the slide simply retargets from wherever it is)
       if (swiped) dy > 0 ? this.next() : this.prev();
     }, { passive: true });
 
