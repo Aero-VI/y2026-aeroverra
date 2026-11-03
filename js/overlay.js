@@ -1,7 +1,7 @@
 // A 2D canvas over the map for everything that moves: the leg being drawn, the vehicle on it, and the
 // "here" marker. It repaints inside MapLibre's own render event, so the line tip, the vehicle and the
 // globe are always from the same frame (no worker round trip, no tip trailing behind the plane).
-import { COLORS as C } from './map.js?v=12';
+import { COLORS as C } from './map.js?v=13';
 
 const GLYPH = {
   f: new Path2D('M0,-11.5c1.3,0,1.8,1.4,1.8,3.2v5l9.2,5.3v2.3l-9.2-2.6v6.2l3.1,2.3v1.8l-4.9-1.3l-4.9,1.3v-1.8l3.1-2.3v-6.2l-9.2,2.6v-2.3l9.2-5.3v-5c0-1.8,0.5-3.2,1.8-3.2z'),

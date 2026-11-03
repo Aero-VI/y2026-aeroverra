@@ -1,8 +1,8 @@
 // The story: one chapter per screen, each with its own camera move on the globe behind it.
-import { fmt, flag, longDate, dateParts } from './data.js?v=12';
-import { setHot, setVisited, setLit, styleLegsState } from './map.js?v=12';
-import { countryColor, TAIL } from './palette.js?v=12';
-import { slerp, clamp, smooth as smoothstep } from './geo.js?v=12';
+import { fmt, flag, longDate, dateParts } from './data.js?v=13';
+import { setHot, setVisited, setLit, styleLegsState } from './map.js?v=13';
+import { countryColor, TAIL } from './palette.js?v=13';
+import { slerp, clamp, smooth as smoothstep } from './geo.js?v=13';
 
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const phone = () => window.innerWidth <= 760;
@@ -333,7 +333,7 @@ export class Story {
     const ms = !animate || from < 0 ? 0 : reduced() ? 250 : 950;
     this.pages.style.transition = ms ? `transform ${ms}ms cubic-bezier(0.65, 0, 0.35, 1)` : 'none';
     this.pages.style.transform = `translate3d(0, ${-i * 100}%, 0)`;
-    this.lock = performance.now() + ms + 250;
+    this.lock = performance.now() + ms + 120;
     const body = this.bodyOf(i);
     if (body) body.scrollTop = 0;
     this.root.scrollTop = 0;
@@ -390,29 +390,33 @@ export class Story {
     // One gesture turns one page. A gesture ends when the wheel goes quiet for a moment; until then
     // everything (a trackpad's long inertia tail included) is ignored, unless the reader clearly pushes
     // again (a sharp rise in speed).
-    let acc = 0, lastT = 0, lastMag = 0, innerT = 0, spent = false;
+    let acc = 0, lastT = 0, lastMag = 0, lastDir = 0, innerT = 0, spent = false;
     window.addEventListener('wheel', e => {
       if (this.suspended || e.ctrlKey) return;
       const dy = e.deltaMode === 1 ? e.deltaY * 32 : e.deltaY;
-      // when the input happened, not when a busy main thread got round to it
-      const t = e.timeStamp || now(), mag = Math.abs(dy);
-      const fresh = t - lastT > 240;
+      // gaps between events are measured on the input's own clock (a busy main thread can't fake a pause);
+      // the page lock is on the page's clock
+      const t = e.timeStamp || now(), clock = now(), mag = Math.abs(dy), dir = Math.sign(dy);
+      const fresh = t - lastT > 240 || (dir && dir !== lastDir);
+      // a mouse-wheel notch (big, separate steps) is a new request every time; a trackpad's momentum tail
+      // fades smoothly and is not
+      const notch = mag >= 50 && mag >= lastMag * 0.9 && t - lastT > 60;
       const push = mag > 28 && mag > lastMag * 1.8;
       if (fresh) { acc = 0; spent = false; if (mag > 4) this.userMoved(); }
-      lastT = t; lastMag = mag;
-      if (this.canScroll(Math.sign(dy)) && t >= this.lock && !spent) {
+      lastT = t; lastMag = mag; if (dir) lastDir = dir;
+      if (this.canScroll(dir) && clock >= this.lock && !spent) {
         // The chapter's text is taller than the screen. Over the text the browser scrolls it; anywhere
         // else (the globe) nothing would move, so scroll it from here.
-        innerT = t;
+        innerT = clock;
         const b = this.bodyOf();
         if (b.contains(e.target)) return;
         e.preventDefault();
-        b.scrollBy({ top: dy, behavior: Math.abs(dy) >= 50 ? 'smooth' : 'auto' });
+        b.scrollBy({ top: dy, behavior: mag >= 50 ? 'smooth' : 'auto' });
         return;
       }
       e.preventDefault();
-      if (spent && !push) return;
-      if (t < this.lock || t - innerT < 350) return;
+      if (clock < this.lock || clock - innerT < 350) return;
+      if (spent && !notch && !push) return;
       acc += dy;
       if (Math.abs(acc) < 24) return;
       acc > 0 ? this.next() : this.prev();
