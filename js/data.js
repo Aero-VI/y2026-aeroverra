@@ -1,6 +1,6 @@
-import { makeArc, sampleArc, km } from './geo.js?v=10';
+import { makeArc, sampleArc, km } from './geo.js?v=11';
 
-const V = '10';
+const V = '11';
 const get = p => fetch(`${p}?v=${V}`).then(r => {
   if (!r.ok) throw new Error(`${p}: HTTP ${r.status}`);
   return r.json();

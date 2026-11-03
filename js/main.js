@@ -1,10 +1,10 @@
-import { loadAll } from './data.js?v=10';
-import { createMap, addLayers } from './map.js?v=10';
-import { Overlay } from './overlay.js?v=10';
-import { Story } from './story.js?v=10';
-import { Player } from './player.js?v=10';
-import { PlayerUI } from './ui.js?v=10';
-import { Sound } from './audio.js?v=10';
+import { loadAll } from './data.js?v=11';
+import { createMap, addLayers } from './map.js?v=11';
+import { Overlay } from './overlay.js?v=11';
+import { Story } from './story.js?v=11';
+import { Player } from './player.js?v=11';
+import { PlayerUI } from './ui.js?v=11';
+import { Sound } from './audio.js?v=11';
 
 const body = document.body;
 const fail = msg => {
@@ -46,20 +46,30 @@ async function boot() {
     map.setPadding({ top: 0, bottom: 0, left: 0, right: 0 });
     map.scrollZoom.disable(); map.dragPan.disable(); map.touchZoomRotate.disable();
     history.replaceState(null, '', to ? `#${to}` : location.pathname);
-    if (to) document.getElementById(to).scrollIntoView({ behavior: 'instant', block: 'start' });
-    story.activate(story.cur ? story.cur.id : 'hero', true);
+    const id = to || (story.cur ? story.cur.id : 'hero');
+    story.cur = null;
+    story.goId(id, false);
   }
   ui.on('close', () => closePlayer());
   ui.on('next', () => closePlayer('next'));
 
-  // sound: the icon shows what you hear, so it reads "off" until a click has actually started the audio
+  // Sound is on by default (unless muted before). Browsers allow no audio until the first tap, click or key,
+  // so it starts on that; until then the speaker pulses.
+  const live = () => !!sound.ctx && sound.ctx.state === 'running';
   const paintSound = () => document.querySelectorAll('[data-act="sound"]').forEach(b => {
-    const live = sound.on && !!sound.ctx;
-    b.setAttribute('aria-pressed', String(live));
-    b.setAttribute('aria-label', live ? 'Mute' : 'Turn sound on');
+    b.setAttribute('aria-pressed', String(sound.on));
+    b.classList.toggle('is-waiting', sound.on && !live());
+    b.setAttribute('aria-label', sound.on ? 'Mute' : 'Turn sound on');
   });
   sound.onChange(paintSound);
   paintSound();
+  const wake = e => {
+    if (!sound.on || live()) return;
+    if (e.target.closest && e.target.closest('[data-act="sound"]')) return;
+    sound.unlock();
+    setTimeout(paintSound, 60);
+  };
+  ['pointerup', 'keydown', 'touchend'].forEach(t => window.addEventListener(t, wake, true));
 
   document.addEventListener('click', e => {
     const b = e.target.closest('[data-act]');
@@ -68,10 +78,9 @@ async function boot() {
     if (act === 'play') openPlayer(0);
     else if (act === 'auto') { sound.unlock(); story.toggleAuto(); sound.intensity(story.auto ? 0.4 : 0.3); paintSound(); }
     else if (act === 'sound') {
-      if (!sound.on) sound.toggle();
-      else if (!sound.ctx) sound.unlock();
+      if (sound.on && !live()) sound.unlock();
       else sound.toggle();
-      paintSound();
+      setTimeout(paintSound, 60);
     }
   });
   const NEXT = ['ArrowDown', 'ArrowRight', 'PageDown'], PREV = ['ArrowUp', 'ArrowLeft', 'PageUp'];
@@ -93,16 +102,10 @@ async function boot() {
     else if (e.key === 'ArrowRight' && e.target.id !== 'track') player.stepLeg(1);
     else if (e.key === 'ArrowLeft' && e.target.id !== 'track') player.stepLeg(-1);
   });
-  // scrolling or swiping by hand takes over from autoplay
-  const manual = () => { if (story.auto && !body.classList.contains('is-film')) story.stopAuto(); };
-  window.addEventListener('wheel', manual, { passive: true });
-  window.addEventListener('touchmove', manual, { passive: true });
+
 
   // story mode: the map is a backdrop, the page scrolls over it
   map.scrollZoom.disable(); map.dragPan.disable(); map.touchZoomRotate.disable(); map.doubleClickZoom.disable();
-  const onScroll = () => body.classList.toggle('is-scrolled', window.scrollY > window.innerHeight * 0.6);
-  window.addEventListener('scroll', onScroll, { passive: true });
-  onScroll();
 
   let last = performance.now();
   const frame = now => {
@@ -135,7 +138,7 @@ async function boot() {
     openPlayer(dayOf((h && h[1]) || q.get('day')));
   } else {
     const id = location.hash.slice(1);
-    story.activate(id && document.getElementById(id) ? id : 'hero', true);
+    story.goId(id && document.getElementById(id) ? id : 'hero', false);
   }
   if (q.has('speed')) player.setSpeed(Number(q.get('speed')) || 1);
   window.__y2026 = { map, player, story, A, sound };

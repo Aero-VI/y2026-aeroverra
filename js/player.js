@@ -2,8 +2,8 @@
 // along the sphere (pull back to see where he is going, push in on arrival), the vehicle rides the exact
 // centre of that path, and on the ground the camera settles and slowly closes in to the scale of the
 // next hop, so Japan's short train rides get room without any country-specific rules.
-import { flyCurve, slerp, arcRad, km, zoomToFit, clamp, ease, lonLat } from './geo.js?v=10';
-import { setHot, setVisited, styleLegsState } from './map.js?v=10';
+import { flyCurve, slerp, arcRad, km, zoomToFit, clamp, ease, lonLat } from './geo.js?v=11';
+import { setHot, setVisited, styleLegsState } from './map.js?v=11';
 
 const SPEEDS = [0.5, 1, 2, 4];
 const PITCH_MAX = 42;

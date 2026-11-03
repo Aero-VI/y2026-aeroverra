@@ -1,8 +1,8 @@
 // The story: one chapter per screen, each with its own camera move on the globe behind it.
-import { fmt, flag, longDate, dateParts } from './data.js?v=10';
-import { setHot, setVisited, setLit, styleLegsState } from './map.js?v=10';
-import { countryColor, TAIL } from './palette.js?v=10';
-import { slerp, clamp } from './geo.js?v=10';
+import { fmt, flag, longDate, dateParts } from './data.js?v=11';
+import { setHot, setVisited, setLit, styleLegsState } from './map.js?v=11';
+import { countryColor, TAIL } from './palette.js?v=11';
+import { slerp, clamp, smooth as smoothstep } from './geo.js?v=11';
 
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const phone = () => window.innerWidth <= 760;
@@ -303,13 +303,15 @@ export class Story {
     this.map = map; this.ov = overlay; this.A = A; this.onPlay = onPlay; this.sound = sound;
     this.list = chapters(A);
     this.root = document.getElementById('story');
-    this.root.innerHTML = this.list.map(ch => `<section class="ch ${ch.id === 'hero' ? 'hero' : ch.id === 'finale' ? 'finale' : ''}" id="${ch.id}" data-ch="${ch.id}"><div class="ch-body">${ch.html}</div></section>`).join('');
+    this.root.innerHTML = `<div class="pages">${this.list.map(ch => `<section class="ch ${ch.id === 'hero' ? 'hero' : ch.id === 'finale' ? 'finale' : ''}" id="${ch.id}" data-ch="${ch.id}"><div class="ch-body">${ch.html}</div></section>`).join('')}</div>`;
+    this.pages = this.root.firstElementChild;
     this.cur = null;
     this.visitedAll = new Set(A.countries.map(c => c.cc));
     this.auto = false;
+    this.lock = 0;
     this.buildProgress();
     this.bindCalendar();
-    this.observe();
+    this.bindPaging();
   }
 
   // ---------------------------------------------------------------- slides: keys, autoplay, progress
@@ -323,28 +325,128 @@ export class Story {
     return Math.max(ch.anim ? ch.anim.loop + 1 : 0, clamp(4.5 + words * 0.11, 6.5, 11));
   }
 
-  go(i, smooth = true) {
+  /** Turn to chapter i. The whole page slides in one eased move; there is no position in between. */
+  go(i, animate = true) {
     i = clamp(i, 0, this.list.length - 1);
-    const el = document.getElementById(this.list[i].id);
-    // a jump of more than one chapter is instant, so the camera does not visit every chapter on the way
-    const far = Math.abs(i - this.index) > 1;
-    window.scrollTo({ top: el.offsetTop, behavior: smooth && !far && !reduced() ? 'smooth' : 'auto' });
-    // the observer would get there too; doing it now keeps a fast run of key presses from skipping ahead
+    const from = this.cur ? this.index : -1;
+    if (i === from && this.cur) return;
+    const ms = !animate || from < 0 ? 0 : reduced() ? 250 : 950;
+    this.pages.style.transition = ms ? `transform ${ms}ms cubic-bezier(0.65, 0, 0.35, 1)` : 'none';
+    this.pages.style.transform = `translate3d(0, ${-i * 100}%, 0)`;
+    this.lock = performance.now() + ms + 250;
+    const body = this.bodyOf(i);
+    if (body) body.scrollTop = 0;
+    this.root.scrollTop = 0;
+    document.body.classList.toggle('is-scrolled', i > 0);
     this.activate(this.list[i].id);
+    document.querySelectorAll('.ch').forEach((s, k) => { s.inert = k !== i; s.setAttribute('aria-hidden', String(k !== i)); });
+  }
+
+  goId(id, animate = true) {
+    const i = this.list.findIndex(c => c.id === id);
+    if (i >= 0) this.go(i, animate);
+  }
+
+  bodyOf(i = this.index) { return this.pages.children[i]?.querySelector('.ch-body'); }
+
+  /** Can the current chapter's own text still scroll that way? (tall chapters on short screens) */
+  canScroll(dir) {
+    const b = this.bodyOf();
+    if (!b || b.scrollHeight <= b.clientHeight + 2) return false;
+    return dir > 0 ? b.scrollTop + b.clientHeight < b.scrollHeight - 2 : b.scrollTop > 2;
   }
 
   next() {
+    if (this.canScroll(1)) { this.bodyOf().scrollBy({ top: this.bodyOf().clientHeight * 0.8, behavior: reduced() ? 'auto' : 'smooth' }); return; }
     if (this.index >= this.list.length - 1) { if (this.auto) { this.stopAuto(); this.onPlay(0); } return; }
     this.go(this.index + 1);
   }
-  prev() { this.go(this.index - 1); }
+  prev() {
+    if (this.canScroll(-1)) { this.bodyOf().scrollBy({ top: -this.bodyOf().clientHeight * 0.8, behavior: reduced() ? 'auto' : 'smooth' }); return; }
+    this.go(this.index - 1);
+  }
+
+  /**
+   * Wheel and swipe turn whole pages. A gesture that the chapter's own text can absorb scrolls the text
+   * first; a trackpad's inertia tail after a turn is ignored, so one flick is one page.
+   */
+  bindPaging() {
+    const now = () => performance.now();
+    // One gesture turns one page. A gesture ends when the wheel goes quiet for a moment; until then
+    // everything (a trackpad's long inertia tail included) is ignored, unless the reader clearly pushes
+    // again (a sharp rise in speed).
+    let acc = 0, lastT = 0, lastMag = 0, innerT = 0, spent = false;
+    window.addEventListener('wheel', e => {
+      if (this.suspended || e.ctrlKey) return;
+      const dy = e.deltaMode === 1 ? e.deltaY * 32 : e.deltaY;
+      // when the input happened, not when a busy main thread got round to it
+      const t = e.timeStamp || now(), mag = Math.abs(dy);
+      const fresh = t - lastT > 240;
+      const push = mag > 28 && mag > lastMag * 1.8;
+      if (fresh) { acc = 0; spent = false; if (mag > 4) this.userMoved(); }
+      lastT = t; lastMag = mag;
+      if (this.canScroll(Math.sign(dy)) && t >= this.lock && !spent) { innerT = t; return; }
+      e.preventDefault();
+      if (spent && !push) return;
+      if (t < this.lock || t - innerT < 350) return;
+      acc += dy;
+      if (Math.abs(acc) < 24) return;
+      acc > 0 ? this.next() : this.prev();
+      acc = 0;
+      spent = true;
+    }, { passive: false });
+
+    let y0 = null, t0 = 0, inner = false;
+    window.addEventListener('touchstart', e => {
+      if (this.suspended || e.touches.length !== 1) { y0 = null; return; }
+      y0 = e.touches[0].clientY; t0 = now(); inner = false;
+    }, { passive: true });
+    window.addEventListener('touchmove', e => {
+      if (y0 == null || this.suspended) return;
+      const dy = y0 - e.touches[0].clientY;
+      if (this.canScroll(Math.sign(dy)) && e.target.closest('.ch-body')) { inner = true; return; }
+      if (e.cancelable) e.preventDefault();
+    }, { passive: false });
+    window.addEventListener('touchend', e => {
+      if (y0 == null || this.suspended) return;
+      const dy = y0 - e.changedTouches[0].clientY, dt = now() - t0;
+      y0 = null;
+      const swiped = Math.abs(dy) > 48 || (Math.abs(dy) > 22 && dt < 250);
+      if (swiped || inner) this.userMoved();
+      if (inner || now() < this.lock) return;
+      if (swiped) dy > 0 ? this.next() : this.prev();
+    }, { passive: true });
+
+    // focus (Tab) or a #chapter link lands on the right page, never on a half-way scroll offset
+    this.root.addEventListener('scroll', () => { this.root.scrollTop = 0; });
+    window.addEventListener('scroll', () => { if (window.scrollY) window.scrollTo(0, 0); });
+    this.root.addEventListener('focusin', e => {
+      const sec = e.target.closest('.ch');
+      const i = sec ? [...this.pages.children].indexOf(sec) : -1;
+      if (i >= 0 && i !== this.index) this.go(i);
+    });
+    window.addEventListener('hashchange', () => {
+      const id = location.hash.slice(1);
+      if (id && this.list.some(c => c.id === id)) this.goId(id);
+    });
+    document.addEventListener('click', e => {
+      const a = e.target.closest('a[href^="#"]');
+      if (!a) return;
+      const id = a.getAttribute('href').slice(1);
+      if (this.list.some(c => c.id === id)) { e.preventDefault(); this.goId(id); }
+    });
+  }
+
+  /** A swipe or a flick from the reader takes over from autoplay (except when recording a film). */
+  userMoved() {
+    if (this.auto && !document.body.classList.contains('is-film')) this.stopAuto();
+  }
 
   startAuto() {
     this.auto = true;
     this.autoT0 = performance.now();
     document.body.classList.add('is-auto');
     this.syncAutoButtons();
-    if (this.index === 0 && window.scrollY > 40) this.go(0, false);
   }
   stopAuto() {
     if (!this.auto) return;
@@ -388,13 +490,6 @@ export class Story {
     const W = window.innerWidth, H = window.innerHeight;
     const v = Math.max(240, Math.min(W - pad.left - pad.right, H - pad.top - pad.bottom));
     return ch.cam.z + Math.log2(v / 700);
-  }
-
-  observe() {
-    const io = new IntersectionObserver(es => {
-      for (const e of es) if (e.isIntersecting) this.activate(e.target.dataset.ch);
-    }, { rootMargin: '-48% 0px -48% 0px' });
-    this.root.querySelectorAll('.ch').forEach(s => io.observe(s));
   }
 
   activate(id, instant = false) {
@@ -459,7 +554,13 @@ export class Story {
     if (this.auto) {
       const frac = (performance.now() - this.autoT0) / 1000 / this.dwell(ch);
       this.paintProgress(Math.min(1, frac));
-      if (frac >= 1) this.next();
+      // a chapter taller than the screen rolls its own text up while it is on, like credits
+      const b = this.bodyOf(), over = b ? b.scrollHeight - b.clientHeight : 0;
+      if (over > 2) b.scrollTop = over * smoothstep(clamp((frac - 0.2) / 0.65, 0, 1));
+      if (frac >= 1) {
+        if (this.index < this.list.length - 1) this.go(this.index + 1);
+        else { this.stopAuto(); this.onPlay(0); }
+      }
     }
     if (ch.anim) {
       const t = ((performance.now() - this.chStart) / 1000) % ch.anim.loop;
