@@ -100,8 +100,39 @@ a { color: inherit; }
 .masthead > * { pointer-events: auto; }
 .wordmark { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; font: 800 26px/1 var(--display); letter-spacing: 0.02em; }
 .wordmark svg { width: 28px; height: 28px; fill: none; stroke: var(--amber); stroke-width: 2.2; stroke-linecap: round; }
-.masthead .btn { opacity: 0; transform: translateY(-6px); transition: opacity 0.3s, transform 0.3s, background-color 0.2s; }
-.is-scrolled .masthead .btn { opacity: 1; transform: none; }
+.masthead { padding-top: max(26px, calc(env(safe-area-inset-top) + 14px)); }
+.mast-acts { display: flex; align-items: center; gap: 8px; }
+.masthead .mast-play { display: none; }
+.is-scrolled .masthead .mast-play { display: inline-flex; animation: rise 0.3s ease; }
+@keyframes rise { from { opacity: 0; transform: translateY(-6px); } }
+
+.icon-btn { width: 44px; padding: 0; justify-content: center; }
+.icon-btn svg, .auto-btn svg { width: 20px; height: 20px; }
+.icon-btn svg { fill: currentColor; }
+.icon-btn .w { fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; }
+.icon-btn .i-on, .icon-btn[aria-pressed='true'] .i-off { display: none; }
+.icon-btn[aria-pressed='true'] .i-on { display: block; }
+.icon-btn[aria-pressed='true'] { color: var(--amber); }
+.auto-btn { padding: 0 16px 0 13px; }
+.auto-btn svg { fill: currentColor; width: 16px; height: 16px; }
+.auto-btn .i-pause, .auto-btn[aria-pressed='true'] .i-play { display: none; }
+.auto-btn[aria-pressed='true'] .i-pause { display: block; }
+.auto-btn[aria-pressed='true'] { box-shadow: inset 0 0 0 1px rgba(255, 181, 71, 0.7); }
+
+/* chapter progress, story style: past chapters full, the current one fills while autoplay runs */
+.progress { position: fixed; z-index: 21; top: max(8px, env(safe-area-inset-top)); left: var(--gutter); right: var(--gutter); display: flex; gap: 4px; }
+.progress button { flex: 1; appearance: none; border: 0; background: none; padding: 5px 0; cursor: pointer; }
+.progress button::before { content: ''; display: block; height: 3px; border-radius: 2px; background: rgba(206, 216, 245, 0.2); }
+.progress i { display: block; height: 3px; margin-top: -3px; border-radius: 2px; background: var(--ink); transform-origin: left center; transform: scaleX(0); }
+.progress button:hover::before { background: rgba(206, 216, 245, 0.4); }
+.is-player .progress { display: none; }
+
+.film-start {
+  position: fixed; inset: 0; z-index: 60; width: 100%; border: 0; cursor: pointer;
+  background: rgba(7, 13, 34, 0.55); color: var(--ink); font: 900 clamp(48px, 8vw, 96px)/1 var(--display); letter-spacing: 0.01em;
+}
+.film-start[hidden] { display: none; }
+.is-film .mast-acts, .is-film .hud-sound { display: none !important; }
 .is-player .masthead { display: none; }
 
 /* ------------------------------------------------------------------ story */
@@ -236,7 +267,7 @@ a { color: inherit; }
 .legcap .mode { font-weight: 600; }
 
 .tally {
-  position: absolute; top: max(20px, env(safe-area-inset-top)); right: calc(var(--gutter) + 120px);
+  position: absolute; top: max(20px, env(safe-area-inset-top)); right: calc(var(--gutter) + 176px);
   display: flex; gap: 26px; pointer-events: none !important;
 }
 .tally div { display: grid; justify-items: end; }
@@ -244,6 +275,7 @@ a { color: inherit; }
 .tally span { text-shadow: 0 1px 8px rgba(7, 13, 34, 1); }
 .tally span { font-size: 13px; color: var(--ink-3); }
 .close { position: absolute; top: max(18px, env(safe-area-inset-top)); right: var(--gutter); padding: 0 16px 0 12px; }
+.hud-sound { position: absolute; top: max(18px, env(safe-area-inset-top)); right: calc(var(--gutter) + 112px); }
 .close svg { width: 18px; height: 18px; stroke: currentColor; stroke-width: 2; }
 
 .toast {
@@ -304,6 +336,7 @@ a { color: inherit; }
 .is-film .deck { grid-template-columns: 1fr; }
 .is-film .track { pointer-events: none; }
 .is-film .tally { right: var(--gutter); }
+.is-film .masthead .mast-play { display: none; }
 
 /* ------------------------------------------------------------------ boot */
 .is-loading #story .ch:not(.hero) { visibility: hidden; }
@@ -328,7 +361,7 @@ a { color: inherit; }
   .cal-days { gap: 1.5px; }
   .ahead li { grid-template-columns: 5.4em 1fr; }
 
-  .board { top: max(12px, env(safe-area-inset-top)); left: 16px; max-width: calc(100vw - 120px); }
+  .board { top: max(12px, env(safe-area-inset-top)); left: 16px; max-width: calc(100vw - 140px); }
   .flaps { gap: 6px; }
   .flaps .cell { font-size: 21px; border-radius: 3px; }
   .place { margin-top: 8px; font-size: 28px; }
@@ -337,6 +370,12 @@ a { color: inherit; }
   .tally div { justify-items: start; }
   .tally b { font-size: 24px; }
   .close { right: 16px; top: max(12px, env(safe-area-inset-top)); padding: 0 12px; }
+  .hud-sound { right: 70px; top: max(12px, env(safe-area-inset-top)); }
+  .auto-btn { width: 44px; padding: 0; justify-content: center; }
+  .auto-btn span { display: none; }
+  .mast-acts { gap: 6px; }
+  .masthead .mast-play { padding: 0 16px; }
+  .progress { left: 16px; right: 16px; gap: 3px; }
   .close span { display: none; }
   .deck { grid-template-columns: auto 1fr; grid-template-areas: 'track track' 'play speeds'; gap: 10px 14px; padding: 12px 16px max(14px, env(safe-area-inset-bottom)); }
   .track { grid-area: track; }

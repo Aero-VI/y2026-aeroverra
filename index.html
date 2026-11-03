@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Where 2026 went: Nicholas Halka's year</title>
-<meta name="description" content="Every flight, ship and train of Nicholas Halka's 2026, drawn on a globe in the order it happened. 26 countries, 86,473 miles.">
+<meta name="description" content="Every flight, ship and train of Nicholas Halka's 2026, drawn on a globe in the order it happened. 26 countries, 86,661 miles.">
 <meta property="og:title" content="Where 2026 went">
-<meta property="og:description" content="26 countries, 39 flights, 7 ships and 62 straight days in Japan, played back on a globe.">
+<meta property="og:description" content="26 countries, 40 flights, 7 ships and 62 straight days in Japan, played back on a globe.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://2026.aeroverra.com/">
 <meta property="og:image" content="https://2026.aeroverra.com/og.png">
@@ -20,19 +20,32 @@
 <link rel="preconnect" href="https://tiles.openfreemap.org" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800;900&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.css">
-<link rel="stylesheet" href="css/site.css?v=9">
+<link rel="stylesheet" href="css/site.css?v=10">
 </head>
 <body class="is-story is-loading">
 <div id="map" aria-hidden="true"></div>
 <div class="scrim" aria-hidden="true"></div>
 
+<nav class="progress" id="progress" aria-label="Chapters"></nav>
 <header class="masthead">
   <a class="wordmark" href="#hero" aria-label="Back to the top">
     <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="13" /><path d="M5.5 19c6-9 15.5-11 21-6" /></svg>
     <span>2026</span>
   </a>
-  <button class="btn btn-solid" type="button" data-act="play">Play the year</button>
+  <div class="mast-acts">
+    <button class="btn btn-ghost icon-btn" type="button" data-act="sound" aria-pressed="false" aria-label="Sound">
+      <svg class="i-on" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" /><path class="w" d="M15.5 9a4.2 4.2 0 0 1 0 6M18 6.5a7.8 7.8 0 0 1 0 11" /></svg>
+      <svg class="i-off" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" /><path class="w" d="M16 9.5l5 5M21 9.5l-5 5" /></svg>
+    </button>
+    <button class="btn btn-ghost auto-btn" type="button" data-act="auto" aria-pressed="false">
+      <svg class="i-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13a.8.8 0 0 0 1.2.7l10.4-6.5a.8.8 0 0 0 0-1.4L9.2 4.8A.8.8 0 0 0 8 5.5z" /></svg>
+      <svg class="i-pause" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1" /><rect x="14" y="5" width="4" height="14" rx="1" /></svg>
+      <span>Autoplay</span>
+    </button>
+    <button class="btn btn-solid mast-play" type="button" data-act="play">Play the year</button>
+  </div>
 </header>
+<button class="film-start" id="filmStart" type="button" hidden>Start</button>
 
 <main id="story" aria-label="The story of the year"></main>
 
@@ -47,6 +60,10 @@
     <div><b id="tMiles">0</b><span>miles</span></div>
     <div><b id="tFlights">0</b><span>flights</span></div>
   </div>
+  <button class="btn btn-ghost icon-btn hud-sound" type="button" data-act="sound" aria-pressed="false" aria-label="Sound">
+    <svg class="i-on" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" /><path class="w" d="M15.5 9a4.2 4.2 0 0 1 0 6M18 6.5a7.8 7.8 0 0 1 0 11" /></svg>
+    <svg class="i-off" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" /><path class="w" d="M16 9.5l5 5M21 9.5l-5 5" /></svg>
+  </button>
   <button class="btn btn-ghost close" type="button" data-act="close" aria-label="Back to the story">
     <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15" /></svg><span>Story</span>
   </button>
@@ -79,6 +96,6 @@
 <p class="boot-error" id="bootError" hidden></p>
 
 <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
-<script type="module" src="js/main.js?v=9"></script>
+<script type="module" src="js/main.js?v=10"></script>
 </body>
 </html>

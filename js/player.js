@@ -2,8 +2,8 @@
 // along the sphere (pull back to see where he is going, push in on arrival), the vehicle rides the exact
 // centre of that path, and on the ground the camera settles and slowly closes in to the scale of the
 // next hop, so Japan's short train rides get room without any country-specific rules.
-import { flyCurve, slerp, arcRad, km, zoomToFit, clamp, ease, lonLat } from './geo.js?v=9';
-import { setHot, setVisited, styleLegsState } from './map.js?v=9';
+import { flyCurve, slerp, arcRad, km, zoomToFit, clamp, ease, lonLat } from './geo.js?v=10';
+import { setHot, setVisited, styleLegsState } from './map.js?v=10';
 
 const SPEEDS = [0.5, 1, 2, 4];
 const PITCH_MAX = 42;
@@ -34,8 +34,8 @@ function buildBeats(A) {
 }
 
 export class Player {
-  constructor(map, overlay, A, ui) {
-    this.map = map; this.ov = overlay; this.A = A; this.ui = ui;
+  constructor(map, overlay, A, ui, sound) {
+    this.map = map; this.ov = overlay; this.A = A; this.ui = ui; this.sound = sound;
     this.beats = buildBeats(A);
     this.speed = 1;
     this.playing = false;
@@ -95,9 +95,9 @@ export class Player {
 
   play() {
     if (this.bi >= this.beats.length) this.seek(0, true);
-    this.playing = true; this.ui.playing(true); this.ui.end(false);
+    this.playing = true; this.ui.playing(true); this.ui.end(false); this.sound.intensity(0.25);
   }
-  pause() { this.playing = false; this.ui.playing(false); }
+  pause() { this.playing = false; this.ui.playing(false); this.sound.intensity(0.12); }
   toggle() { this.playing ? this.pause() : this.play(); }
   setSpeed(s) { this.speed = s; this.ui.speed(s); }
   setFollow(on, ease = true) {
@@ -193,6 +193,11 @@ export class Player {
       const curve = flyCurve(c0, z0, L.b, zA, this.viewPx());
       b.plan = { c0, z0, curve, near: arcRad(c0, L.a) < 0.02 };
       b.dur = this.legDuration(L, curve.S);
+      if (this.playing) {
+        const size = clamp(L.km / 7000, 0, 1);
+        this.sound.depart(L.t, b.dur, size);
+        if (L.t !== 'g') this.sound.intensity(L.t === 'f' || L.t === 'c' ? 0.5 + 0.5 * size : 0.45);
+      }
       this.leg = { L, f: 0 };
       this.ov.here = null;
       this.ui.leg(L);
@@ -201,6 +206,7 @@ export class Player {
       this.setDay(Math.max(b.day, L.i0));
     } else {
       b.dur = b.kind === 'pause' ? (b.port ? 0.45 : 0.25) : (b.run < 3 ? 0.24 : 0.085);
+      if (b.kind === 'dwell' && this.playing) this.sound.intensity(0.22);
       this.setDay(b.day);
       const d = A.days[b.day];
       if (b.kind === 'pause') this.ui.place({ ...d, city: b.L.bc, ccs: d.ccs || [] }, b.L.bcc !== 'SEA' ? b.L.bcc : null);
@@ -261,7 +267,10 @@ export class Player {
     if (!cc || cc === 'SEA' || this.visited.has(cc)) return;
     this.visited.add(cc);
     setVisited(this.map, this.A, this.visited);
-    if (announce && this.playing) this.ui.toast(cc, this.A.names[cc], this.visited.size, this.newEver.has(cc));
+    if (announce && this.playing) {
+      this.ui.toast(cc, this.A.names[cc], this.visited.size, this.newEver.has(cc));
+      this.sound.arrive();
+    }
   }
 
   arrive() {

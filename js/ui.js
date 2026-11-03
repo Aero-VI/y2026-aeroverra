@@ -1,17 +1,18 @@
 // The player's heads-up display: departure-board date, where he is, running totals, the year ribbon.
-import { fmt, dateParts, flag, MODE } from './data.js?v=9';
-import { countryColor } from './palette.js?v=9';
+import { fmt, dateParts, flag, MODE } from './data.js?v=10';
+import { countryColor } from './palette.js?v=10';
 
 const $ = id => document.getElementById(id);
 
 class Flaps {
-  constructor(el) { this.el = el; this.groups = []; }
+  constructor(el, onFlip) { this.el = el; this.groups = []; this.onFlip = onFlip; }
   set(parts) {
     if (this.groups.length !== parts.length) {
       this.el.innerHTML = parts.map(p => `<span class="grp">${[...p].map(() => '<span class="cell"></span>').join('')}</span>`).join('');
       this.groups = [...this.el.querySelectorAll('.grp')].map(g => [...g.children]);
       this.last = parts.map(p => ' '.repeat(p.length));
     }
+    let flipped = false;
     parts.forEach((p, gi) => {
       const cells = this.groups[gi];
       [...p.padEnd(cells.length)].slice(0, cells.length).forEach((ch, ci) => {
@@ -19,9 +20,11 @@ class Flaps {
         const c = cells[ci];
         c.textContent = ch;
         c.classList.remove('flip'); void c.offsetWidth; c.classList.add('flip');
+        flipped = true;
       });
       this.last[gi] = p.padEnd(cells.length);
     });
+    if (flipped && this.onFlip) this.onFlip();
   }
 }
 
@@ -30,7 +33,7 @@ export class PlayerUI {
     this.A = A;
     this.root = $('player');
     this.ev = {};
-    this.flaps = new Flaps($('fDate'));
+    this.flaps = new Flaps($('fDate'), () => this.onFlip && this.onFlip());
     this.cum = cumulative(A);
     this.root.addEventListener('click', e => {
       const b = e.target.closest('[data-act]');

@@ -1,8 +1,8 @@
 // The story: one chapter per screen, each with its own camera move on the globe behind it.
-import { fmt, flag, longDate, dateParts } from './data.js?v=9';
-import { setHot, setVisited, setLit, styleLegsState } from './map.js?v=9';
-import { countryColor, TAIL } from './palette.js?v=9';
-import { slerp, clamp } from './geo.js?v=9';
+import { fmt, flag, longDate, dateParts } from './data.js?v=10';
+import { setHot, setVisited, setLit, styleLegsState } from './map.js?v=10';
+import { countryColor, TAIL } from './palette.js?v=10';
+import { slerp, clamp } from './geo.js?v=10';
 
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const phone = () => window.innerWidth <= 760;
@@ -50,7 +50,7 @@ export function chapters(A) {
         <p class="lede">Every flight, ship and train of his year, drawn on the globe in the order it happened: <strong>${W.countries} countries</strong> and <strong>${fmt(W.total_miles)} miles</strong> so far.</p>
         <div class="hero-acts">
           <button class="btn btn-solid" type="button" data-act="play">Play the year</button>
-          <a class="btn btn-ghost" href="#countries">Read the story</a>
+          <button class="btn btn-ghost" type="button" data-act="auto">Watch the story</button>
         </div>
         <p class="asof">Through ${longDate(A.today)}, day ${W.day_of_year} of 365.</p>`,
     },
@@ -299,15 +299,80 @@ function calendar(A) {
 
 // ---------------------------------------------------------------- controller
 export class Story {
-  constructor(map, overlay, A, onPlay) {
-    this.map = map; this.ov = overlay; this.A = A; this.onPlay = onPlay;
+  constructor(map, overlay, A, onPlay, sound) {
+    this.map = map; this.ov = overlay; this.A = A; this.onPlay = onPlay; this.sound = sound;
     this.list = chapters(A);
     this.root = document.getElementById('story');
     this.root.innerHTML = this.list.map(ch => `<section class="ch ${ch.id === 'hero' ? 'hero' : ch.id === 'finale' ? 'finale' : ''}" id="${ch.id}" data-ch="${ch.id}"><div class="ch-body">${ch.html}</div></section>`).join('');
     this.cur = null;
     this.visitedAll = new Set(A.countries.map(c => c.cc));
+    this.auto = false;
+    this.buildProgress();
     this.bindCalendar();
     this.observe();
+  }
+
+  // ---------------------------------------------------------------- slides: keys, autoplay, progress
+  get index() { return Math.max(0, this.list.indexOf(this.cur)); }
+
+  /** Seconds a chapter stays up in autoplay: long enough to read it and to see its camera move land. */
+  dwell(ch) {
+    if (ch.id === 'hero') return 5.5;
+    if (ch.id === 'finale') return 4.5;
+    const words = ch.html.replace(/<[^>]+>/g, ' ').split(/\s+/).filter(Boolean).length;
+    return Math.max(ch.anim ? ch.anim.loop + 1 : 0, clamp(4.5 + words * 0.11, 6.5, 11));
+  }
+
+  go(i, smooth = true) {
+    i = clamp(i, 0, this.list.length - 1);
+    const el = document.getElementById(this.list[i].id);
+    // a jump of more than one chapter is instant, so the camera does not visit every chapter on the way
+    const far = Math.abs(i - this.index) > 1;
+    window.scrollTo({ top: el.offsetTop, behavior: smooth && !far && !reduced() ? 'smooth' : 'auto' });
+    // the observer would get there too; doing it now keeps a fast run of key presses from skipping ahead
+    this.activate(this.list[i].id);
+  }
+
+  next() {
+    if (this.index >= this.list.length - 1) { if (this.auto) { this.stopAuto(); this.onPlay(0); } return; }
+    this.go(this.index + 1);
+  }
+  prev() { this.go(this.index - 1); }
+
+  startAuto() {
+    this.auto = true;
+    this.autoT0 = performance.now();
+    document.body.classList.add('is-auto');
+    this.syncAutoButtons();
+    if (this.index === 0 && window.scrollY > 40) this.go(0, false);
+  }
+  stopAuto() {
+    if (!this.auto) return;
+    this.auto = false;
+    document.body.classList.remove('is-auto');
+    this.syncAutoButtons();
+    this.paintProgress();
+  }
+  toggleAuto() { this.auto ? this.stopAuto() : this.startAuto(); }
+  syncAutoButtons() {
+    document.querySelectorAll('[data-act="auto"]').forEach(b => b.setAttribute('aria-pressed', String(this.auto)));
+    const m = document.querySelector('.auto-btn span');
+    if (m) m.textContent = this.auto ? 'Pause' : 'Autoplay';
+  }
+
+  buildProgress() {
+    const nav = document.getElementById('progress');
+    nav.innerHTML = this.list.map((ch, i) => `<button type="button" data-go="${i}" aria-label="Chapter ${i + 1} of ${this.list.length}"><i></i></button>`).join('');
+    this.bars = [...nav.querySelectorAll('i')];
+    nav.addEventListener('click', e => {
+      const b = e.target.closest('[data-go]');
+      if (b) { this.go(Number(b.dataset.go)); if (this.auto) this.autoT0 = performance.now(); }
+    });
+  }
+
+  paintProgress(frac = 1) {
+    const k = this.index;
+    this.bars.forEach((b, i) => { b.style.transform = `scaleX(${i < k ? 1 : i > k ? 0 : (this.auto ? frac : 1)})`; });
   }
 
   padding(ch) {
@@ -336,10 +401,14 @@ export class Story {
     if (this.cur && this.cur.id === id && !instant) return;
     const ch = this.list.find(c => c.id === id);
     if (!ch) return;
+    const changed = this.cur && this.cur !== ch;
     this.cur = ch;
     this.chStart = performance.now();
+    this.autoT0 = this.chStart;
     if (this.suspended) return;
+    if (changed && this.sound) this.sound.turn();
     this.apply(ch, instant);
+    this.paintProgress(0);
   }
 
   apply(ch, instant) {
@@ -387,6 +456,11 @@ export class Story {
     const ch = this.cur;
     if (!ch || this.suspended) return;
     const m = this.map;
+    if (this.auto) {
+      const frac = (performance.now() - this.autoT0) / 1000 / this.dwell(ch);
+      this.paintProgress(Math.min(1, frac));
+      if (frac >= 1) this.next();
+    }
     if (ch.anim) {
       const t = ((performance.now() - this.chStart) / 1000) % ch.anim.loop;
       const legs = ch.anim.legs;
