@@ -1,370 +1,80 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>2026 WRAPPED — Nicholas Halka</title>
-<meta name="description" content="2026 Wrapped: 26 countries, 86,867 miles, 149 hours in the air, 73 nights at sea, 33 days in no country at all. Every number pulled from real flight confirmations, hotel bookings and cruise manifests.">
-<meta name="theme-color" content="#05060b">
-<meta property="og:title" content="2026 WRAPPED · Nicholas Halka">
-<meta property="og:description" content="26 countries. 86,867 miles. 149 hours airborne. 33 days in no country at all. The year, as a film.">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Where 2026 went: Nicholas Halka's year</title>
+<meta name="description" content="Every flight, ship and train of Nicholas Halka's 2026, drawn on a globe in the order it happened. 26 countries, 86,473 miles.">
+<meta property="og:title" content="Where 2026 went">
+<meta property="og:description" content="26 countries, 39 flights, 7 ships and 62 straight days in Japan, played back on a globe.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://2026.aeroverra.com/">
-<link rel="stylesheet" href="css/wrapped.css?v=5">
+<meta name="theme-color" content="#070d22">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%23070d22' stroke='%23ffb547' stroke-width='2'/%3E%3Cpath d='M5 19c6-9 16-11 22-6' fill='none' stroke='%23ffb547' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://tiles.openfreemap.org" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800;900&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.css">
+<link rel="stylesheet" href="css/site.css?v=7">
 </head>
-<body>
+<body class="is-story is-loading">
+<div id="map" aria-hidden="true"></div>
+<div class="scrim" aria-hidden="true"></div>
 
-<div class="glows"><i></i><i></i><i></i><i></i></div>
-<div class="grain"></div>
-<canvas id="fx"></canvas>
+<header class="masthead">
+  <a class="wordmark" href="#hero" aria-label="Back to the top">
+    <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="13" /><path d="M5.5 19c6-9 15.5-11 21-6" /></svg>
+    <span>2026</span>
+  </a>
+  <button class="btn btn-solid" type="button" data-act="play">Play the year</button>
+</header>
 
-<div class="rail" id="rail" aria-hidden="true"></div>
-<div class="nav" id="nav"><b>01</b> / 21 &nbsp;·&nbsp; scroll or press →</div>
-<div class="ctl">
-  <button id="filmBtn" title="Autoplay every scene, hands off. Good for screen recording.">▶ FILM</button>
-  <button id="frameBtn" title="Lock to a 9:16 frame for vertical video">9:16</button>
-  <button id="muteBtn" class="on" title="Toggle background motion">MOTION</button>
-</div>
+<main id="story" aria-label="The story of the year"></main>
 
-<main id="deck">
-
-<!-- ============ 01 COVER ============ -->
-<section class="scene" data-dur="5200" id="s1">
-  <div class="wrap cover">
-    <div class="kick rv">Nicholas Halka · <b>@nnickkh</b></div>
-    <h1 class="yr" aria-label="2026"><span>2</span><span>0</span><span>2</span><span>6</span></h1>
-    <p class="wordmark rv d1">WRAPPED</p>
-    <p class="sub rv d2">Not a recap of a finished year. A status report, <b>305 days in</b>, with 60 still on the board.</p>
-    <div class="ticks rv d3">
-      <div class="tick"><i>26</i> countries</div>
-      <div class="tick"><i>86,867</i> miles</div>
-      <div class="tick"><i>149</i> hours airborne</div>
-      <div class="tick"><i>73</i> nights at sea</div>
-      <div class="tick"><i>47</i> nights in his own bed</div>
-    </div>
-    <div class="cta rv d4">
-      <button class="btn" id="startBtn">Play the year ▸</button>
-      <a class="btn ghost" href="explore.html">Explore the raw data</a>
-    </div>
+<section id="player" aria-label="Year playback" hidden>
+  <div class="board" aria-live="polite">
+    <div class="flaps" id="fDate" aria-label="Date"></div>
+    <p class="place" id="pPlace"></p>
+    <p class="legcap" id="pLeg"></p>
   </div>
-  <div class="hintdn">scroll<i></i></div>
-</section>
-
-<!-- ============ 02 DAYS ============ -->
-<section class="scene" data-dur="5000">
-  <div class="wrap">
-    <div class="kick rv">Chapter 01 · the raw clock</div>
-    <h2 class="big rv d1"><span class="num grad" data-k="day_of_year">305</span></h2>
-    <p class="lede rv d2">days of 2026 have happened. <b data-k="days_tracked">304</b> of them have a booking behind
-      them, so we can say exactly which country he woke up in.</p>
-    <div class="grid g3 rv d3">
-      <div class="card"><div class="k">slept at home</div><div class="v"><span data-k="home_days">47</span><small>nights</small></div><div class="s">Fifteen percent of the year in his own bed.</div></div>
-      <div class="card"><div class="k">different cities</div><div class="v" data-k="cities_slept">68</div><div class="s">Cities he physically stood in. Same backpack in every one.</div></div>
-      <div class="card"><div class="k">separate trips</div><div class="v" data-k="trips">15</div><div class="s">Each one its own flight-hotel-cruise chain.</div></div>
-    </div>
-    <div class="foot rv d4">One day in the whole year has no record: January 15. More on that later.</div>
+  <div class="tally" aria-label="Running totals">
+    <div><b id="tCountries">0</b><span>countries</span></div>
+    <div><b id="tMiles">0</b><span>miles</span></div>
+    <div><b id="tFlights">0</b><span>flights</span></div>
   </div>
-</section>
-
-<!-- ============ 03 COUNTRIES ============ -->
-<section class="scene" data-dur="5600">
-  <div class="wrap">
-    <div class="kick rv">Chapter 02 · the count</div>
-    <h2 class="big rv d1"><span class="num grad" data-k="countries">26</span></h2>
-    <p class="lede rv d2">countries in 305 days. That is a new one every <b data-k="pace_days_per_country">12.2</b> days,
-      territories counted on their own, the way he insists.</p>
-    <div class="storm" id="storm" aria-label="Flags of every country visited in 2026"></div>
-    <div class="foot rv d4">Ordered by days spent. The faded ones are the single-day hits.</div>
-  </div>
-</section>
-
-<!-- ============ 04 NEW COUNTRIES ============ -->
-<section class="scene" data-dur="6200">
-  <div class="wrap">
-    <div class="kick rv">Chapter 03 · first contact</div>
-    <h2 class="big sm rv d1"><span class="num s2 grad" data-k="new_count">16</span> <span class="unit">were brand new</span></h2>
-    <p class="lede wide rv d2">Of the 26, sixteen were countries he had <b>never once set foot in</b> across the entire
-      booking record going back to 2005. A year that was over half discovery.</p>
-    <div class="newgrid" id="newgrid"></div>
-  </div>
-</section>
-
-<!-- ============ 05 THE SPLIT ============ -->
-<section class="scene" data-dur="5600">
-  <div class="wrap">
-    <div class="kick rv">Chapter 04 · the split</div>
-    <h2 class="big sm rv d1">Home is the <span class="grad">minority</span></h2>
-    <p class="lede rv d2">Three buckets, 304 tracked days.</p>
-    <div class="bars rv d3" id="splitBars"></div>
-    <div class="grid g3 rv d4" style="margin-top:22px">
-      <div class="card"><div class="k">abroad</div><div class="v"><span data-k="pct_abroad">56</span><small>%</small></div><div class="s">170 days on foreign soil.</div></div>
-      <div class="card"><div class="k">United States</div><div class="v"><span data-k="pct_us">33</span><small>%</small></div><div class="s">101 days, and 8 of those nights were Waikiki.</div></div>
-      <div class="card hi"><div class="k">no country at all</div><div class="v"><span data-k="days_sea">33</span><small>days</small></div><div class="s">Open water. Outside every jurisdiction on earth.</div></div>
+  <button class="btn btn-ghost close" type="button" data-act="close" aria-label="Back to the story">
+    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15" /></svg><span>Story</span>
+  </button>
+  <div class="toast" id="toast" role="status"></div>
+  <button class="btn btn-ghost follow" type="button" data-act="follow" hidden>Follow the trip</button>
+  <div class="endcard" id="endcard" hidden>
+    <p class="end-title">That's the year so far.</p>
+    <p class="end-sub">Next stop is on the last page of the story.</p>
+    <div class="end-acts">
+      <button class="btn btn-solid" type="button" data-act="again">Play again</button>
+      <button class="btn btn-ghost" type="button" data-act="next">See what's next</button>
     </div>
   </div>
-</section>
-
-<!-- ============ 06 TOP COUNTRY ============ -->
-<section class="scene" data-dur="5400">
-  <div class="wrap">
-    <div class="kick rv">Chapter 05 · the obsession</div>
-    <div class="rv d1" style="font-size:clamp(56px,12vw,150px);line-height:1">🇯🇵</div>
-    <h2 class="big sm rv d2"><span class="num s2 grad" data-k="top1_days">63</span> <span class="unit">days in Japan</span></h2>
-    <p class="lede wide rv d3">One in every five days of his year happened in Japan. More than Australia, Malta and
-      Spain <b>combined</b>.</p>
-    <div class="bars rv d4" id="topBars"></div>
-  </div>
-</section>
-
-<!-- ============ 07 THE BLOCK ============ -->
-<section class="scene" data-dur="6000">
-  <div class="wrap">
-    <div class="kick rv">Chapter 06 · the longest stretch</div>
-    <h2 class="big sm rv d1"><span class="num s2 grad">62</span> <span class="unit">days without changing country</span></h2>
-    <p class="lede wide rv d2">March 3 to May 3, Japan, unbroken. In the same run he went <b>61 straight days</b>
-      without touching American soil, the longest he was gone all year.</p>
-    <div class="strip365" id="strip365" aria-hidden="true"></div>
-    <div class="foot rv d4">Every day of 2026, left to right. Pink is the Japan block, blue is the US, mint is at sea.</div>
-  </div>
-</section>
-
-<!-- ============ 08 DISTANCE ============ -->
-<section class="scene" data-dur="6400">
-  <div class="wrap">
-    <div class="kick rv">Chapter 07 · the odometer</div>
-    <h2 class="big rv d1"><span class="num grad" data-k="total_miles">86,867</span></h2>
-    <p class="lede rv d2">miles covered on booked transport. Great circles between real airports and real ports,
-      not a GPS trace, so if anything it is the <b>floor</b>.</p>
-    <div class="grid g4 rv d3">
-      <div class="card"><div class="k">by air</div><div class="v"><span data-k="air_miles">63,396</span></div><div class="s">39 flights.</div></div>
-      <div class="card"><div class="k">by sea</div><div class="v"><span data-k="sea_miles">21,210</span></div><div class="s">7 ships, port to port.</div></div>
-      <div class="card"><div class="k">rail &amp; road</div><div class="v"><span data-k="rail_miles">2,261</span></div><div class="s">Shinkansen and coaches.</div></div>
-      <div class="card hi"><div class="k">times around the equator</div><div class="v"><span data-k="equators">3.49</span><small>×</small></div><div class="s">36% of the way to the moon.</div></div>
+  <div class="deck">
+    <button class="playbtn" type="button" data-act="toggle" aria-label="Pause">
+      <svg class="i-pause" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1" /><rect x="14" y="5" width="4" height="14" rx="1" /></svg>
+      <svg class="i-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13a.8.8 0 0 0 1.2.7l10.4-6.5a.8.8 0 0 0 0-1.4L9.2 4.8A.8.8 0 0 0 8 5.5z" /></svg>
+    </button>
+    <div class="track" id="track" role="slider" tabindex="0" aria-label="Day of the year" aria-valuemin="1" aria-valuemax="365" aria-valuenow="1">
+      <canvas id="ribbon"></canvas>
+      <div class="track-mask" id="trackMask"></div>
+      <div class="playhead" id="playhead"></div>
+      <div class="months" id="months"></div>
     </div>
+    <div class="speeds" id="speeds" role="group" aria-label="Playback speed"></div>
   </div>
 </section>
 
-<!-- ============ 09 AIR TIME ============ -->
-<section class="scene" data-dur="5600">
-  <div class="wrap">
-    <div class="kick rv">Chapter 08 · time in a tube</div>
-    <h2 class="big rv d1"><span class="num grad" data-k="air_hours">149</span><span class="unit">hours</span></h2>
-    <p class="lede wide rv d2">Measured off the booked schedules, that is <b data-k="air_days">6.2</b> entire days of
-      2026 spent inside a pressurised aluminium cylinder at altitude.</p>
-    <div class="grid g3 rv d3">
-      <div class="card"><div class="k">time zones crossed</div><div class="v"><span data-k="tz_hours">101</span><small>hrs</small></div><div class="s">Every clock change added up as an absolute shift. Jet lag as a scalar.</div></div>
-      <div class="card"><div class="k">red-eyes</div><div class="v" data-k="redeyes">5</div><div class="s">Flights that took off on one date and landed on another.</div></div>
-      <div class="card"><div class="k">earliest wheels-up</div><div class="v">00:40</div><div class="s">ZIPAIR out of Singapore, straight through the night to Tokyo.</div></div>
-    </div>
-  </div>
-</section>
+<noscript><p class="noscript">This page draws the year on an interactive globe and needs JavaScript.</p></noscript>
+<p class="boot-error" id="bootError" hidden></p>
 
-<!-- ============ 10 LONGEST FLIGHT ============ -->
-<section class="scene" data-dur="6000">
-  <div class="wrap">
-    <div class="kick rv">Chapter 09 · the big one</div>
-    <h2 class="big sm rv d1">The <span class="grad">longest</span> single leg</h2>
-    <div class="pass rv d2" id="pass">
-      <div class="top">
-        <div class="ap">LAX<span>Los Angeles</span></div>
-        <div class="mid">
-          <svg viewBox="0 0 300 44" preserveAspectRatio="none" aria-hidden="true">
-            <defs><linearGradient id="pg" x1="0" x2="1"><stop offset="0" stop-color="#6ea8ff"/><stop offset="1" stop-color="#ff7ac8"/></linearGradient></defs>
-            <path class="pathline" d="M4 34 C 90 -2, 210 -2, 296 34"/>
-            <circle class="dot" cx="296" cy="34" r="4.5" fill="#fff"/>
-          </svg>
-        </div>
-        <div class="ap">BNE<span>Brisbane</span></div>
-      </div>
-      <div class="strip">
-        <div><div class="k">flight</div><div class="v">DL 93</div></div>
-        <div><div class="k">date</div><div class="v">14 Jan 2026</div></div>
-        <div><div class="k">block time</div><div class="v">14h 30m</div></div>
-        <div><div class="k">distance</div><div class="v">7,166 mi</div></div>
-        <div><div class="k">clock shift</div><div class="v">+18 hrs</div></div>
-      </div>
-    </div>
-    <p class="lede wide rv d4">The shortest of the year, for contrast: <b>FR 6616, Alicante to Ibiza, 112 miles</b>.
-      Sixty-four times shorter, same calendar year.</p>
-  </div>
-</section>
-
-<!-- ============ 11 BIGGEST DAY ============ -->
-<section class="scene" data-dur="6200">
-  <div class="wrap">
-    <div class="kick rv">Chapter 10 · the day that ate itself</div>
-    <h2 class="big rv d1"><span class="num grad" data-k="bigday_miles">9,424</span></h2>
-    <p class="lede wide rv d2">miles in a single day: <b>14 January</b>, Myrtle Beach to Atlanta to Los Angeles to
-      Brisbane. Three flights, one calendar day.</p>
-    <div class="grid g3 rv d3">
-      <div class="card"><div class="k">leg 1</div><div class="v" style="font-size:clamp(20px,3vw,34px)">MYR → ATL</div><div class="s">DL 3182 · 316 mi</div></div>
-      <div class="card"><div class="k">leg 2</div><div class="v" style="font-size:clamp(20px,3vw,34px)">ATL → LAX</div><div class="s">DL 500 · 1,942 mi</div></div>
-      <div class="card hi"><div class="k">leg 3</div><div class="v" style="font-size:clamp(20px,3vw,34px)">LAX → BNE</div><div class="s">DL 93 · 7,166 mi · over the date line</div></div>
-    </div>
-    <p class="lede wide rv d4" style="margin-top:24px"><b>And then January 15 never happened.</b> He crossed the
-      International Date Line westbound and the day was deleted from his year. It is the one blank tile on the whole
-      calendar, and it is blank because it does not exist.</p>
-  </div>
-</section>
-
-<!-- ============ 12 AIRPORTS ============ -->
-<section class="scene" data-dur="5800">
-  <div class="wrap">
-    <div class="kick rv">Chapter 11 · the terminals</div>
-    <h2 class="big sm rv d1"><span class="num s2 grad" data-k="flights">39</span> <span class="unit">flights · 32 airports · 17 airlines</span></h2>
-    <p class="lede rv d2">A flight every <b data-k="flight_every">7.8</b> days, all year, including the months he
-      was supposedly sitting still.</p>
-    <div class="bars rv d3" id="apBars"></div>
-    <div class="foot rv d5">Atlanta saw him ten times. Delta flew twelve of the thirty-nine. October was the heaviest
-      month in the air, with ten departures.</div>
-  </div>
-</section>
-
-<!-- ============ 13 SEA ============ -->
-<section class="scene" data-dur="6000">
-  <div class="wrap">
-    <div class="kick rv">Chapter 12 · the water</div>
-    <h2 class="big rv d1"><span class="num grad" data-k="cruise_nights">73</span></h2>
-    <p class="lede rv d2">nights aboard <b data-k="cruises">7</b> different ships. Nearly a quarter of his year was
-      spent in a hotel that was moving.</p>
-    <div class="grid g4 rv d3" id="shipCards"></div>
-    <div class="foot rv d5"><span data-k="port_calls">33</span> port calls, <span data-k="unique_ports">31</span> of
-      them different. Two crossings of the Atlantic on the same ship: out in August, back in October.</div>
-  </div>
-</section>
-
-<!-- ============ 14 BEDS ============ -->
-<section class="scene" data-dur="5600">
-  <div class="wrap">
-    <div class="kick rv">Chapter 13 · the beds</div>
-    <h2 class="big sm rv d1"><span class="num s2 grad" data-k="hotels">41</span> <span class="unit">hotels · 122 nights</span></h2>
-    <p class="lede rv d2">Average stay <b data-k="avg_stay">3</b> nights, which is the statistical signature of a man
-      who does not unpack.</p>
-    <div class="grid g3 rv d3">
-      <div class="card hi"><div class="k">longest stay of the year</div><div class="v" style="font-size:clamp(20px,3.2vw,38px)">16 nights</div><div class="s">APA Hotel Akihabara Suehirochoekimae, Tokyo. He lived in Akihabara for over two weeks.</div></div>
-      <div class="card"><div class="k">most re-booked cities</div><div class="v" style="font-size:clamp(20px,3.2vw,38px)">Tokyo · St. Julian's</div><div class="s">Five separate bookings each. Japan and Malta are the two places he kept checking back into.</div></div>
-      <div class="card"><div class="k">own bed</div><div class="v" style="font-size:clamp(20px,3.2vw,38px)">47 nights</div><div class="s">Myrtle Beach. Fewer nights at home than at sea plus Japan.</div></div>
-    </div>
-  </div>
-</section>
-
-<!-- ============ 15 WHIPLASH ============ -->
-<section class="scene" data-dur="6200">
-  <div class="wrap">
-    <div class="kick rv">Chapter 14 · whiplash</div>
-    <h2 class="big rv d1"><span class="num grad" data-k="switches">29</span></h2>
-    <p class="lede rv d2">border changes. Twelve days of 2026 had him in <b>two</b> countries, and three days had him
-      in <b>three</b>.</p>
-    <div class="grid g3 rv d3" id="tripleCards"></div>
-    <div class="card rv d5" style="margin-top:18px">
-      <div class="k">busiest seven days of the year</div>
-      <div class="v" style="font-size:clamp(20px,3vw,34px)">14 – 20 June</div>
-      <div class="s" id="weekLine">Six countries in one week, off the Sapphire Princess in the Baltic.</div>
-    </div>
-  </div>
-</section>
-
-<!-- ============ 16 EXTREMES ============ -->
-<section class="scene" data-dur="5800">
-  <div class="wrap">
-    <div class="kick rv">Chapter 15 · the corners</div>
-    <h2 class="big sm rv d1"><span class="num s2 grad" data-k="span_lat">94</span><span class="unit">degrees of latitude</span></h2>
-    <p class="lede wide rv d2">From <b>Helsinki at 60°N</b> to <b>Sydney at 34°S</b>. A quarter of the planet's
-      north-south span, inside one calendar year, in both hemispheres.</p>
-    <div class="grid g4 rv d3">
-      <div class="card"><div class="k">northernmost</div><div class="v" style="font-size:clamp(19px,2.8vw,32px)">Helsinki</div><div class="s">60.17° N · 14 June</div></div>
-      <div class="card"><div class="k">southernmost</div><div class="v" style="font-size:clamp(19px,2.8vw,32px)">Sydney</div><div class="s">33.94° S · January</div></div>
-      <div class="card"><div class="k">east / west edge</div><div class="v" style="font-size:clamp(19px,2.8vw,32px)">Brisbane ↔ Honolulu</div><div class="s">153° E to 158° W</div></div>
-      <div class="card hi"><div class="k">crossings</div><div class="v" style="font-size:clamp(19px,2.8vw,32px)">2 equator · 3 date line</div><div class="s">One of which cost him an entire day.</div></div>
-    </div>
-  </div>
-</section>
-
-<!-- ============ 17 MONTHS ============ -->
-<section class="scene" data-dur="6000">
-  <div class="wrap">
-    <div class="kick rv">Chapter 16 · twelve moods</div>
-    <h2 class="big sm rv d1">The <span class="grad">shape</span> of the year</h2>
-    <p class="lede rv d2">Different countries touched in each month. June and July are where the year went
-      completely feral.</p>
-    <div class="mrail2" id="mrail2"></div>
-  </div>
-</section>
-
-<!-- ============ 18 LEADERBOARD ============ -->
-<section class="scene" data-dur="6400">
-  <div class="wrap">
-    <div class="kick rv">Chapter 17 · the table</div>
-    <h2 class="big sm rv d1">Days, by <span class="grad">country</span></h2>
-    <div class="bars rv d2" id="lbBars"></div>
-    <div class="foot rv d4">A day counts if he stood in that country at any point, so a travel day can land in two
-      rows at once. At sea is kept separate, because it is nobody's territory.</div>
-  </div>
-</section>
-
-<!-- ============ 19 BIRTHDAY BEAT ============ -->
-<section class="scene beat" data-dur="5200">
-  <div class="wrap beat">
-    <div class="kick rv">Chapter 18 · 29 May</div>
-    <p class="q rv d1">He turned 29 in a year with<br><em>26 countries</em> in it,<br>and spent the day<br><em>at home</em>.</p>
-    <p class="lede rv d3" style="margin-left:auto;margin-right:auto;max-width:34ch">Myrtle Beach, South Carolina.
-      Mid-way through the only 33-day stretch he spent standing still all year.</p>
-  </div>
-</section>
-
-<!-- ============ 20 HERE NOW / NEXT ============ -->
-<section class="scene" id="next" data-dur="7000">
-  <div class="wrap">
-    <div class="kick rv">Chapter 19 · <b>where he is right now</b></div>
-    <div class="now rv d1" id="nowBox">
-      <div class="pin">📍</div>
-      <div style="flex:1;min-width:220px">
-        <div class="t">here now</div>
-        <div class="c" id="nowCity">Barcelona, Spain</div>
-        <div class="d" id="nowLine">Landed 09:10 this morning on AA 742 out of Philadelphia.</div>
-      </div>
-      <div style="text-align:right">
-        <div class="t">day</div>
-        <div class="c" id="nowDay">1</div>
-      </div>
-    </div>
-    <div class="kick rv d3" style="margin-top:24px">here next</div>
-    <div class="nextlist" id="nextList"></div>
-    <p class="lede wide rv d5" style="margin-top:20px">If any of that overlaps with you, that is the entire point of
-      publishing it. Come find him: <a href="https://instagram.com/nnickkh">@nnickkh</a></p>
-  </div>
-</section>
-
-<!-- ============ 21 END ============ -->
-<section class="scene" data-dur="9000">
-  <div class="wrap end">
-    <div class="kick rv">and the year is not over</div>
-    <h2 class="big rv d1"><span class="num grad" data-k="days_left">60</span></h2>
-    <p class="lede rv d2" style="margin-left:auto;margin-right:auto">days left on the board. Africa is still unticked,
-      and the house hunt in Alicante has not started.</p>
-    <div class="links rv d3">
-      <a class="btn" href="explore.html">Explore every day, interactively ▸</a>
-      <a class="btn ghost" href="https://travel.aeroverra.com">The lifetime map</a>
-      <button class="btn ghost" id="againBtn">Replay the film ↺</button>
-    </div>
-    <p class="meta rv d4"><strong>Method.</strong> Every figure on this page is derived from the trip database behind
-      <a href="https://travel.aeroverra.com">travel.aeroverra.com</a>: flight confirmations, hotel bookings and cruise
-      manifests, 2005 to now. Days are assigned by booking (flight departure and arrival dates, hotel check-in through
-      check-out, cruise embark, port calls and disembark); an unbooked day is only filled when the bookings either side
-      agree on the country. Sea days belong to no country and are counted on their own. Distances are great circles
-      between real coordinates, so they are minimums, not flown tracks. Air time comes from the booked schedule on 38
-      of the 39 flights; one Vienna to Malta ticket has no times on the confirmation. Territories are counted as their
-      own entry. Generated <span id="genline">1 November 2026</span>.</p>
-    <p class="meta">Built by Azula.</p>
-  </div>
-</section>
-
-</main>
-
-<noscript><div style="padding:30px;color:#9aa3c7;font:14px system-ui">
-  This page animates with JavaScript, but every number above is already in the HTML. The interactive version lives at
-  <a href="explore.html">explore.html</a>.</div></noscript>
-
-<script src="js/wrapped.js?v=5"></script>
+<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
+<script type="module" src="js/main.js?v=7"></script>
 </body>
 </html>
