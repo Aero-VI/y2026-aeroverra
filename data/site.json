@@ -1,0 +1,22 @@
+{
+  "year": 2026,
+  "complete": false,
+  "siblings": [{ "year": 2025, "url": "https://2025.aeroverra.com/" }],
+  "notes": {
+    "bigday": "Jan 14 started at home in Myrtle Beach and ended over the Pacific: three flights, one day.",
+    "top-country": "<strong>62 of them in a row</strong>, from Mar 3 into May: Hokkaido, Tokyo, a Grand Prix at Suzuka, then Osaka, Himeji, Akita and Kyoto by Shinkansen.",
+    "ships": "the Great Barrier Reef, Darwin to Bali, the Baltic, Alaska's Inside Passage, and the Atlantic twice.",
+    "week": "the Baltic on the Sapphire Princess, then a flight to London.",
+    "extremes": "From the Baltic summer to the Australian one.",
+    "hotels": "<strong>16 nights at the APA Hotel in Akihabara</strong>, Tokyo's electronics district"
+  },
+  "hotel": { "p": [35.7027, 139.7716], "label": "APA Hotel Akihabara", "z": 15.2, "p0": 58, "b": -24 },
+  "extras": [
+    {
+      "id": "f1", "after": "week", "stat": "2", "unit": "Grand Prix weekends",
+      "lede": "Formula 1 at Suzuka in March, then the Hungaroring outside Budapest in July.",
+      "cam": { "c": [44, 78], "z": 1.45 },
+      "pins": [{ "p": [34.8431, 136.5407], "label": "Suzuka" }, { "p": [47.5789, 19.2486], "label": "Hungaroring" }]
+    }
+  ]
+}

@@ -1,43 +1,57 @@
 // The story: one chapter per screen, each with its own camera move on the globe behind it.
-import { fmt, flag, longDate, dateParts } from './data.js?v=15';
-import { setHot, setVisited, setLit, styleLegsState } from './map.js?v=15';
-import { countryColor, TAIL } from './palette.js?v=15';
-import { slerp, clamp, smooth as smoothstep } from './geo.js?v=15';
+import { fmt, flag, longDate, dateParts } from './data.js?v=16';
+import { setHot, setVisited, setLit, styleLegsState } from './map.js?v=16';
+import { countryColor, TAIL } from './palette.js?v=16';
+import { slerp, clamp, smooth as smoothstep } from './geo.js?v=16';
 
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const phone = () => window.innerWidth <= 760;
 const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 const stat = (n, u) => `<h2 class="stat"><span class="n">${n}</span><span class="u">${u}</span></h2>`;
-const inJapan = p => p[0] > 30 && p[0] < 46 && p[1] > 128 && p[1] < 146;
 const parallel = lat => Array.from({ length: 181 }, (_, k) => [lat, -180 + k * 2]);
 const hm = mins => `${Math.floor(mins / 60)}h ${String(mins % 60).padStart(2, '0')}m`;
 
 export function chapters(A) {
-  const W = A.wrapped, N = A.next;
+  const W = A.wrapped, N = A.next, S = A.site, Y = A.year;
   const legs = A.legs;
-  const byNum = n => legs.find(L => L.n === n);
+  const note = id => (S.notes && S.notes[id]) || '';
   const lf = W.longest_flight;
-  const longest = byNum(lf.num);
+  const longest = lf && (legs.find(L => L.t === 'f' && L.d0 === lf.date && L.al === lf.frm && L.bl === lf.to) || legs.find(L => L.n === lf.num));
   const big = legs.filter(L => L.d0 === W.biggest_day.d && L.t === 'f');
-  const jp = legs.filter(L => inJapan(L.a) && inJapan(L.b));
   const bw = W.busiest_week;
-  const week = legs.filter(L => L.d0 >= '2026-06-13' && L.d1 <= bw.end && L.i0 >= A.dayIdx['2026-06-13']);
-  const firstEver = new Set(W.new_countries.map(c => c.cc));
+  const weekFrom = A.days[Math.max(0, (A.dayIdx[bw.start] ?? 0) - 1)].d;
+  const week = legs.filter(L => L.d0 >= weekFrom && L.d1 <= bw.end);
+  const firstEver = W.new_countries.slice().sort((a, b) => a.on.localeCompare(b.on));
   const today = new Date().toISOString().slice(0, 10);
+  const month = iso => dateParts(iso).mon.replace(/^(Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Oct|Nov|Dec)$/, m => ({ Jan: 'January', Feb: 'February', Mar: 'March', Apr: 'April', Jun: 'June', Jul: 'July', Aug: 'August', Sep: 'September', Oct: 'October', Nov: 'November', Dec: 'December' }[m]));
+  const placeOf = name => A.places.find(p => p.name === name);
 
   const all = A.countriesAll;
-  const sea = all.find(c => c.cc === 'SEA');
   const ranked = all.slice().sort((a, b) => b.days - a.days);
   const top = ranked.filter(c => c.days >= 5);
   const tail = ranked.filter(c => c.days < 5);
 
-  // where he is now, judged by the reader's own date
-  const every = [{ ...N.now, from: N.now.since, status: 'now' }, ...N.next];
+  // the country (outside home) he spent longest in, and the places he slept there
+  const tc = W.top_nonus[0];
+  const tcPlaces = A.places.filter(p => p.cc === tc.cc).sort((a, b) => b.days - a.days);
+  const tcRun = W.longest_runs.find(r => r.cc === tc.cc);
+  const tcLegs = legs.filter(L => L.acc === tc.cc && L.bcc === tc.cc);
+
+  // the blank square in the calendar, if the date line ate a day
+  const lostDay = A.days.find(d => !d.future && d.ccs && !d.ccs.length);
+
+  const every = N ? [{ ...N.now, from: N.now.since, status: 'now' }, ...N.next] : [];
   let ahead = every.filter(e => (e.to || e.from) >= today);
   if (!ahead.length) ahead = every.slice(-1);
   const nowIdx = Math.max(0, ahead.findIndex(e => e.from <= today && (e.to || e.from) >= today));
 
-  return [
+  const minutes = Math.max(2, Math.round((legs.length * 2.1 + 70) / 60));
+  const lastPos = A.days[A.todayIdx].p;
+  const north = placeOf(W.north.label), south = placeOf(W.south.label);
+  const stay = W.longest_stay, stayPlace = placeOf(stay.city);
+  const hotelPin = S.hotel || (stayPlace && { p: stayPlace.p, label: null, z: 11.5, p0: 30 });
+
+  const list = [
     {
       id: 'hero',
       cam: { c: [26, -44], z: 1.8 },
@@ -46,13 +60,13 @@ export function chapters(A) {
       intro: true,
       html: `
         <p class="hero-name">Nicholas Halka</p>
-        <h1 class="hero-title">Where <span class="yr">2026</span> went</h1>
-        <p class="lede">Every flight, ship and train of his year, drawn on the globe in the order it happened: <strong>${W.countries} countries</strong> and <strong>${fmt(W.total_miles)} miles</strong> so far.</p>
+        <h1 class="hero-title">Where <span class="yr">${Y}</span> went</h1>
+        <p class="lede">Every flight, ship and train of his year, drawn on the globe in the order it happened: <strong>${W.countries} countries</strong> and <strong>${fmt(W.total_miles)} miles</strong>${A.complete ? '' : ' so far'}.</p>
         <div class="hero-acts">
           <button class="btn btn-solid" type="button" data-act="play">Play the year</button>
           <button class="btn btn-ghost" type="button" data-act="auto">Watch the story</button>
         </div>
-        <p class="asof">Through ${longDate(A.today)}, day ${W.day_of_year} of 365.</p>`,
+        <p class="asof">${A.complete ? `January 1 to December 31, ${Y}.` : `Through ${longDate(A.today)}, day ${W.day_of_year} of ${A.days.length}.`}${(S.siblings || []).map(s => ` <a href="${s.url}">${s.year}</a>`).join('')}</p>`,
     },
     {
       id: 'countries',
@@ -62,11 +76,11 @@ export function chapters(A) {
       legs: { all: 0.3 },
       html: `
         ${stat(W.countries, 'countries')}
-        <p class="lede">${W.countries_nonus} outside the US, and <strong>${firstEver.size} of them for the first time</strong>, from Australia in January to Gibraltar in October. Territories count on their own.</p>
+        <p class="lede">${W.countries_nonus} outside the US${firstEver.length ? `, and <strong>${firstEver.length} of them for the first time</strong>, from ${esc(firstEver[0].name)} in ${month(firstEver[0].on)} to ${esc(firstEver[firstEver.length - 1].name)} in ${month(firstEver[firstEver.length - 1].on)}` : ''}. Territories count on their own.</p>
         <ul class="viz flags">${A.countries.slice().sort((a, b) => b.days - a.days).map(c => `
-          <li class="${firstEver.has(c.cc) ? 'new' : ''}" title="${esc(c.name)}"><span class="f" aria-hidden="true">${flag(c.cc)}</span><b>${c.cc}</b><span class="d">${c.days} ${c.days === 1 ? 'day' : 'days'}</span></li>`).join('')}
+          <li class="${firstEver.some(f => f.cc === c.cc) ? 'new' : ''}" title="${esc(c.name)}"><span class="f" aria-hidden="true">${flag(c.cc)}</span><b>${c.cc}</b><span class="d">${c.days} ${c.days === 1 ? 'day' : 'days'}</span></li>`).join('')}
         </ul>
-        <p class="key"><i></i>First time ever</p>`,
+        ${firstEver.length ? '<p class="key"><i></i>First time ever</p>' : ''}`,
     },
     {
       id: 'distance',
@@ -94,84 +108,82 @@ export function chapters(A) {
       legs: { focus: ['f'] },
       html: `
         ${stat(W.flights, 'flights')}
-        <p class="lede"><strong>${W.air_hours} hours</strong> in the air on ${W.airlines} airlines, through ${W.airports} airports. A flight every ${Math.round(W.flight_every)} days, and ${W.redeyes} overnighters.</p>
+        <p class="lede"><strong>${W.air_hours} hours</strong> in the air on ${W.airlines} airlines, through ${W.airports} airports. A flight every ${Math.round(W.flight_every)} days${W.redeyes ? `, and ${W.redeyes} overnighter${W.redeyes === 1 ? '' : 's'}` : ''}.</p>
         <ul class="viz bars">${W.top_airports.slice(0, 6).map(([code, n]) => `
           <li><span class="nm">${code}</span><span class="bar" style="width:${(n / W.top_airports[0][1]) * 100}%"></span><span class="v">${n}</span></li>`).join('')}
         </ul>
         <p class="key">Times through each airport</p>`,
     },
-    {
+    big.length > 1 && {
       id: 'bigday',
-      cam: { c: [10, -138], z: 1.45 },
+      cam: camFit(big.flatMap(L => [L.a, L.b])),
       legs: { ids: big.map(L => L.i) },
       anim: { legs: big, loop: 7.5 },
       html: `
         ${stat(fmt(W.biggest_day.miles), 'miles in one day')}
-        <p class="lede">${longDate(W.biggest_day.d)} started at home in Myrtle Beach and ended over the Pacific: three flights, one day.</p>
+        <p class="lede">${note('bigday') || `${longDate(W.biggest_day.d)} started in ${esc(big[0].ac)} and ended in ${esc(big[big.length - 1].bc)}: ${big.length} flights, one day.`}</p>
         <ul class="viz legs">${W.biggest_day.legs.map(l => `
-          <li><span class="code">${esc(l.num)}</span><span>${esc(l.frm)} to ${esc(l.to)}</span><span class="v">${fmt(l.miles)} mi</span></li>`).join('')}
+          <li><span class="code">${esc(l.num || '✈')}</span><span>${esc(l.frm)} to ${esc(l.to)}</span><span class="v">${fmt(l.miles)} mi</span></li>`).join('')}
         </ul>`,
     },
-    {
-      id: 'dateline',
-      cam: { c: [2, -172], z: 1.75 },
+    longest && {
+      id: 'longest',
+      cam: camFit([longest.a, longest.b], 0.35),
       legs: { ids: [longest.i] },
       anim: { legs: [longest], loop: 6.5 },
-      guides: [{ pts: Array.from({ length: 61 }, (_, k) => [-60 + k * 2, 180]), color: '#ffb547', dash: [5, 6], label: 'Date line', labelAt: 0.62 }],
+      guides: longest.dl != null ? [{ pts: Array.from({ length: 61 }, (_, k) => [-60 + k * 2, 180]), color: '#ffb547', dash: [5, 6], label: 'Date line', labelAt: 0.62 }] : [],
       html: `
         ${stat(hm(lf.mins), 'the longest flight')}
-        <p class="lede">${esc(lf.num)} from Los Angeles to Brisbane, ${fmt(lf.miles)} miles overnight. It left at ${lf.dep_local} on ${longDate(lf.date)} and landed at ${lf.arr_local} on the 16th.</p>
-        <p class="lede"><strong>January 15 never happened.</strong> Flying west over the date line skipped it, so it is the one blank square in his calendar.</p>`,
+        <p class="lede">${lf.num ? `${esc(lf.num)} from` : 'From'} ${esc(lf.frm_city)} to ${esc(lf.to_city)}, ${fmt(lf.miles)} miles${lf.overnight ? ' overnight' : ''}. It left at ${lf.dep_local} on ${longDate(lf.date)}${lf.arr_local ? ` and landed at ${lf.arr_local}` : ''}.</p>
+        ${lostDay && longest.dl != null ? `<p class="lede"><strong>${month(lostDay.d)} ${dateParts(lostDay.d).d} never happened.</strong> Flying west over the date line skipped it, so it is the one blank square in his calendar.</p>` : ''}`,
     },
-    {
-      id: 'japan',
-      cam: { c: [37.6, 138.4], z: 4.7, p: 28 },
-      legs: { ids: jp.map(L => L.i) },
-      hot: 'JP',
+    tc && {
+      id: 'top-country',
+      cam: { ...camFit(tcPlaces.map(p => p.p), 0.6), p: 28 },
+      legs: { ids: tcLegs.map(L => L.i) },
+      hot: tc.cc,
       html: `
-        ${stat(W.top_nonus[0].days, 'days in Japan')}
-        <p class="lede"><strong>${W.longest_runs[0].n} of them in a row</strong>, from ${longDate(W.longest_runs[0].start)} into May: Hokkaido, Tokyo, a Grand Prix at Suzuka, then Osaka, Himeji, Akita and Kyoto by Shinkansen.</p>
-        <ul class="viz stops">${['Tokyo', 'Niseko', 'Nagoya', 'Suzuka', 'Osaka', 'Himeji', 'Kyoto', 'Akita', 'Noshiro'].map(s => `<li>${s}</li>`).join('')}</ul>`,
+        ${stat(tc.days, `days in ${esc(tc.name)}`)}
+        <p class="lede">${note('top-country') || (tcRun && tcRun.n > 4 ? `<strong>${tcRun.n} of them in a row</strong>, from ${longDate(tcRun.start)}.` : `Across ${tcPlaces.length} ${tcPlaces.length === 1 ? 'place' : 'places'}.`)}</p>
+        <ul class="viz stops">${tcPlaces.slice(0, 9).map(p => `<li>${esc(p.name)}</li>`).join('')}</ul>`,
     },
-    {
+    W.cruises > 0 && {
       id: 'ships',
       cam: { c: [38, -28], z: 1.3 },
       spin: 1,
       legs: { focus: ['c'] },
       html: `
         ${stat(W.cruise_nights, 'nights on ships')}
-        <p class="lede">${W.cruises} cruises and ${W.port_calls} port calls: the Great Barrier Reef, Darwin to Bali, the Baltic, Alaska's Inside Passage, and the Atlantic twice.</p>
+        <p class="lede">${W.cruises} ${W.cruises === 1 ? 'cruise' : 'cruises'} and ${W.port_calls} port calls${note('ships') ? `: ${note('ships')}` : '.'}</p>
         <ul class="viz legs ships">${W.ships.slice().sort((a, b) => a.start.localeCompare(b.start)).map(s => `
           <li><span class="code">${esc(s.ship.replace(/^Carnival /, ''))}</span><span>${esc(shortPort(s.frm))} to ${esc(shortPort(s.to))}</span><span class="v">${s.nights} nights</span></li>`).join('')}
         </ul>`,
     },
-    {
+    bw && bw.n > 3 && {
       id: 'week',
-      cam: { c: [57.5, 19], z: 3.9, p: 15 },
+      cam: { ...camFit(week.flatMap(L => [L.a, L.b]), 0.4), p: 15 },
       legs: { ids: week.map(L => L.i) },
-      anim: { legs: week, loop: 9 },
+      anim: week.length ? { legs: week, loop: Math.max(6, Math.min(12, week.length * 1.2)) } : null,
       html: `
         ${stat(bw.n, 'countries in a week')}
-        <p class="lede">${longDate(bw.start)} to ${longDate(bw.end)}: the Baltic on the Sapphire Princess, then a flight to London.</p>
-        <ul class="viz stops">${bw.ccs.map(cc => `<li>${flag(cc)} <b>${esc(A.names[cc])}</b></li>`).join('')}</ul>`,
+        <p class="lede">${longDate(bw.start)} to ${longDate(bw.end)}${note('week') ? `: ${note('week')}` : '.'}</p>
+        <ul class="viz stops">${bw.ccs.map(cc => `<li>${flag(cc)} <b>${esc(A.names[cc] || cc)}</b></li>`).join('')}</ul>`,
     },
-    {
-      id: 'f1',
-      cam: { c: [44, 78], z: 1.45 },
+    ...(S.extras || []).map(x => ({
+      id: x.id,
+      cam: x.cam || camFit(x.pins.map(p => p.p)),
       legs: { all: 0.2 },
-      pins: [{ p: [34.8431, 136.5407], label: 'Suzuka' }, { p: [47.5789, 19.2486], label: 'Hungaroring' }],
-      html: `
-        ${stat('2', 'Grand Prix weekends')}
-        <p class="lede">Formula 1 at Suzuka in March, then the Hungaroring outside Budapest in July.</p>`,
-    },
+      pins: x.pins,
+      html: `${stat(esc(x.stat), esc(x.unit))}<p class="lede">${x.lede}</p>`,
+    })),
     {
       id: 'hotels',
-      cam: { c: [35.7027, 139.7716], z: 15.2, p: 58, b: -24 },
+      cam: hotelPin ? { c: hotelPin.p, z: hotelPin.z || 15.2, p: hotelPin.p0 ?? 58, b: hotelPin.b ?? -24 } : { c: [30, 0], z: 1.2 },
       legs: { all: 0 },
-      pins: [{ p: [35.7027, 139.7716], label: 'APA Hotel Akihabara' }],
+      pins: hotelPin ? [{ p: hotelPin.p, label: hotelPin.label }] : [],
       html: `
         ${stat(W.hotels, 'hotels')}
-        <p class="lede">${W.hotel_nights} hotel nights. The longest stay was <strong>${W.longest_stay.nights} nights at the APA Hotel in Akihabara</strong>, Tokyo's electronics district.</p>
+        <p class="lede">${W.hotel_nights} hotel nights. The longest stay was ${note('hotels') || `<strong>${stay.nights} nights at ${esc(stay.name.replace(/ \(Extended\)$/, ''))}</strong> in ${esc(stay.city)}`}.</p>
         <ul class="viz bars">${W.hotel_cities.slice(0, 5).map(([c, n]) => `
           <li><span class="nm">${esc(c)}</span><span class="bar" style="width:${(n / W.hotel_cities[0][1]) * 100}%;--c:var(--ink-3)"></span><span class="v">${n}</span></li>`).join('')}
         </ul>
@@ -185,7 +197,7 @@ export function chapters(A) {
       pins: [{ p: [33.6891, -78.8867] }],
       html: `
         ${stat(W.home_days, 'nights in his own bed')}
-        <p class="lede">Home is Myrtle Beach. Of the ${W.day_of_year} days so far, he spent ${W.days_us} in the US, ${W.days_abroad} abroad and ${W.days_sea} at sea.</p>
+        <p class="lede">Home is Myrtle Beach. Of the ${W.day_of_year} days${A.complete ? ' of the year' : ' so far'}, he spent ${W.days_us} in the US, ${W.days_abroad} abroad and ${W.days_sea} at sea.</p>
         <div class="split" aria-hidden="true">
           <span style="flex:${W.days_us};background:${countryColor('US')}"></span>
           <span style="flex:${W.days_abroad};background:var(--amber)"></span>
@@ -199,21 +211,21 @@ export function chapters(A) {
     },
     {
       id: 'extremes',
-      cam: { c: [12, 92], z: 1.05 },
+      cam: { c: north && south ? slerp(north.p, south.p, 0.5) : [20, 0], z: 1.05 },
       legs: { all: 0.25 },
       guides: [
-        { pts: parallel(W.north.lat), color: '#ffb547', label: `${W.north.lat.toFixed(1)}° N`, labelAt: 0.6 },
-        { pts: parallel(W.south.lat), color: '#55d6c2', label: `${Math.abs(W.south.lat).toFixed(1)}° S`, labelAt: 0.6 },
+        { pts: parallel(W.north.lat), color: '#ffb547', label: latLabel(W.north.lat), labelAt: 0.6 },
+        { pts: parallel(W.south.lat), color: '#55d6c2', label: latLabel(W.south.lat), labelAt: 0.6 },
       ],
-      pins: [{ p: [60.17, 24.94], label: 'Helsinki' }, { p: [-33.87, 151.21], label: 'Sydney' }],
+      pins: [north && { p: north.p, label: north.name }, south && { p: south.p, label: south.name }].filter(Boolean),
       html: `
         ${stat(`${Math.round(W.span_lat)}°`, 'of latitude')}
-        <p class="lede">From the Baltic summer to the Australian one.</p>
+        <p class="lede">${note('extremes') || `From ${esc(W.north.label)} down to ${esc(W.south.label)}.`}</p>
         <ul class="viz compass">
-          <li><span class="k">Farthest north</span><span class="p">${esc(W.north.label)}</span><span class="d">${W.north.lat.toFixed(2)}° N</span></li>
-          <li><span class="k">Farthest south</span><span class="p">${esc(W.south.label)}</span><span class="d">${Math.abs(W.south.lat).toFixed(2)}° S</span></li>
-          <li><span class="k">Farthest east</span><span class="p">${esc(W.east.label)}</span><span class="d">${W.east.lon.toFixed(2)}° E</span></li>
-          <li><span class="k">Farthest west</span><span class="p">${esc(W.west.label)}</span><span class="d">${Math.abs(W.west.lon).toFixed(2)}° W</span></li>
+          <li><span class="k">Farthest north</span><span class="p">${esc(W.north.label)}</span><span class="d">${latLabel(W.north.lat, 2)}</span></li>
+          <li><span class="k">Farthest south</span><span class="p">${esc(W.south.label)}</span><span class="d">${latLabel(W.south.lat, 2)}</span></li>
+          <li><span class="k">Farthest east</span><span class="p">${esc(W.east.label)}</span><span class="d">${lonLabel(W.east.lon)}</span></li>
+          <li><span class="k">Farthest west</span><span class="p">${esc(W.west.label)}</span><span class="d">${lonLabel(W.west.lon)}</span></li>
         </ul>`,
     },
     {
@@ -226,7 +238,7 @@ export function chapters(A) {
         <h2 class="stat"><span class="u" style="margin:0">Where the days went</span></h2>
         <ul class="viz bars" style="margin-top:22px">${top.map(c => `
           <li><span class="nm">${c.cc === 'SEA' ? 'At sea' : `${flag(c.cc)} ${esc(c.name)}`}</span><span class="bar" style="width:${(c.days / ranked[0].days) * 100}%;--c:${countryColor(c.cc)}"></span><span class="v">${c.days}</span></li>`).join('')}
-          <li><span class="nm">${tail.length} more</span><span class="bar" style="width:${(tail.reduce((s, c) => s + c.days, 0) / ranked[0].days) * 100}%;--c:${TAIL}"></span><span class="v">${tail.reduce((s, c) => s + c.days, 0)}</span></li>
+          ${tail.length ? `<li><span class="nm">${tail.length} more</span><span class="bar" style="width:${(tail.reduce((s, c) => s + c.days, 0) / ranked[0].days) * 100}%;--c:${TAIL}"></span><span class="v">${tail.reduce((s, c) => s + c.days, 0)}</span></li>` : ''}
         </ul>
         <p class="key">Days per country. A travel day counts for both ends, so the total runs past ${W.day_of_year}.</p>`,
     },
@@ -242,7 +254,7 @@ export function chapters(A) {
         ${calendar(A)}
         <p class="cal-tip" id="calTip" aria-live="polite"></p>`,
     },
-    {
+    !A.complete && N && {
       id: 'next',
       cam: { c: [14, 12], z: 2.2 },
       legs: { all: 0.25 },
@@ -259,6 +271,16 @@ export function chapters(A) {
         </ul>
         <p class="meet">Nearby? He wants to hear from you. Say hi on Instagram at <a href="https://www.instagram.com/nnickkh/">@nnickkh</a>.</p>`,
     },
+    A.complete && {
+      id: 'next',
+      cam: { c: lastPos, z: 4.5, p: 20 },
+      legs: { all: 0.35 },
+      pins: [{ p: lastPos, label: A.days[A.todayIdx].city }],
+      html: `
+        <h2 class="stat"><span class="u" style="margin:0">And then came ${Y + 1}</span></h2>
+        <p class="lede">${Y} ended in ${esc(A.days[A.todayIdx].city)}. The next year picks up from there.</p>
+        ${(S.siblings || []).filter(s => s.year === Y + 1).map(s => `<div class="hero-acts"><a class="btn btn-solid" href="${s.url}">See ${s.year}</a></div>`).join('')}`,
+    },
     {
       id: 'finale',
       cam: { c: [24, -42], z: 1.2 },
@@ -266,11 +288,40 @@ export function chapters(A) {
       legs: { all: 0.7 },
       html: `
         <h2 class="hero-title">Watch it happen</h2>
-        <p class="lede">All ${legs.length} legs in order, with the camera riding along. About four and a half minutes at normal speed, and you can scrub to any day.</p>
+        <p class="lede">All ${legs.length} legs in order, with the camera riding along. About ${minutes} minutes at normal speed, and you can scrub to any day.</p>
         <div class="hero-acts"><button class="btn btn-solid" type="button" data-act="play">Play the year</button></div>
-        <p class="method">Built from his booking confirmations: every flight, train, bus, cruise and hotel. A day counts for each country he set foot in. Dotted lines are hops with no ticket on file, like a drive or a local train. Distances are great circles. Updated ${longDate(A.today)}, 2026.<br><br>Map © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, <a href="https://openmaptiles.org">OpenMapTiles</a>, served by <a href="https://openfreemap.org">OpenFreeMap</a>. Terrain from Mapzen on AWS Open Data. Borders from Natural Earth.</p>`,
+        <p class="method">Built from his booking confirmations: every flight, train, bus, cruise and hotel. A day counts for each country he set foot in. Dotted lines are hops with no ticket on file, like a drive or a local train. Distances are great circles. ${A.complete ? `Covers all of ${Y}.` : `Updated ${longDate(A.today)}, ${Y}.`}${(S.siblings || []).length ? ` Other years: ${S.siblings.map(s => `<a href="${s.url}">${s.year}</a>`).join(', ')}.` : ''}<br><br>Map © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, <a href="https://openmaptiles.org">OpenMapTiles</a>, served by <a href="https://openfreemap.org">OpenFreeMap</a>. Terrain from Mapzen on AWS Open Data. Borders from Natural Earth.</p>`,
     },
-  ];
+  ].filter(Boolean);
+
+  // optional chapters go where the year's config says (after a named chapter)
+  for (const x of S.extras || []) {
+    if (!x.after) continue;
+    const i = list.findIndex(c => c.id === x.id), j = list.findIndex(c => c.id === x.after);
+    if (i >= 0 && j >= 0) list.splice(j + 1, 0, ...list.splice(i, 1));
+  }
+  return list;
+}
+
+const latLabel = (lat, d = 1) => `${Math.abs(lat).toFixed(d)}° ${lat >= 0 ? 'N' : 'S'}`;
+const lonLabel = lon => `${Math.abs(lon).toFixed(2)}° ${lon >= 0 ? 'E' : 'W'}`;
+
+/** A camera that frames a set of points: their spherical middle, zoomed to their spread (700px view basis). */
+function camFit(points, pad = 0.5) {
+  const pts = points.filter(Boolean);
+  if (!pts.length) return { c: [20, 0], z: 1.2 };
+  const R = Math.PI / 180;
+  let x = 0, y = 0, z = 0;
+  for (const [la, lo] of pts) { x += Math.cos(la * R) * Math.cos(lo * R); y += Math.cos(la * R) * Math.sin(lo * R); z += Math.sin(la * R); }
+  const c = [Math.atan2(z, Math.hypot(x, y)) / R, Math.atan2(y, x) / R];
+  let span = 0;
+  for (const p of pts) span = Math.max(span, arcDeg(c, p));
+  const zoom = Math.log2(180 / Math.max(1.5, span * 2 * (1 + pad))) + 1.3;
+  return { c, z: clamp(zoom, 1.05, 7) };
+}
+function arcDeg(a, b) {
+  const R = Math.PI / 180, p1 = a[0] * R, p2 = b[0] * R, dl = (b[1] - a[1]) * R;
+  return Math.acos(clamp(Math.sin(p1) * Math.sin(p2) + Math.cos(p1) * Math.cos(p2) * Math.cos(dl), -1, 1)) / R;
 }
 
 const shortPort = s => String(s).replace('Cape Canaveral', 'Port Canaveral');
@@ -292,7 +343,7 @@ function calendar(A) {
       return `<button type="button" class="${cls}" data-day="${d.i}"${style} aria-label="${d.d}"${d.future ? ' tabindex="-1"' : ''}></button>`;
     }).join('')}</div></div>`;
   });
-  const keys = ['US', 'JP', 'SEA', 'AU', 'MT', 'ES', 'GB'];
+  const keys = A.countriesAll.slice().sort((a, b) => b.days - a.days).slice(0, 7).map(c => c.cc);
   return `<div class="viz cal">${rows.join('')}</div>
     <ul class="cal-key">${keys.map(c => `<li><i style="background:${countryColor(c)}"></i>${c === 'SEA' ? 'At sea' : esc(A.names[c])}</li>`).join('')}<li><i style="background:${TAIL}"></i>Everywhere else</li></ul>`;
 }

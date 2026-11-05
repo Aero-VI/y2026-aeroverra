@@ -1,10 +1,10 @@
-import { loadAll } from './data.js?v=15';
-import { createMap, addLayers, webglAvailable, nullMap } from './map.js?v=15';
-import { Overlay } from './overlay.js?v=15';
-import { Story } from './story.js?v=15';
-import { Player } from './player.js?v=15';
-import { PlayerUI } from './ui.js?v=15';
-import { Sound } from './audio.js?v=15';
+import { loadAll } from './data.js?v=16';
+import { createMap, addLayers, webglAvailable, nullMap } from './map.js?v=16';
+import { Overlay } from './overlay.js?v=16';
+import { Story } from './story.js?v=16';
+import { Player } from './player.js?v=16';
+import { PlayerUI } from './ui.js?v=16';
+import { Sound } from './audio.js?v=16';
 
 const body = document.body;
 const fail = msg => {
@@ -163,6 +163,7 @@ async function boot() {
   }
   if (q.has('speed')) player.setSpeed(Number(q.get('speed')) || 1);
   window.__y2026 = { map, player, story, A, sound };
+  document.title = `Where ${A.year} went: Nicholas Halka's year`;
 }
 
 boot().catch(e => {

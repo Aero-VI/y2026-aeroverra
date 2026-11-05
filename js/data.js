@@ -1,6 +1,7 @@
-import { makeArc, sampleArc, km } from './geo.js?v=15';
+import { makeArc, sampleArc, km } from './geo.js?v=16';
+import { setPalette } from './palette.js?v=16';
 
-const V = '15';
+const V = '16';
 const get = p => fetch(`${p}?v=${V}`).then(r => {
   if (!r.ok) throw new Error(`${p}: HTTP ${r.status}`);
   return r.json();
@@ -12,10 +13,17 @@ export const flag = cc => (!cc || cc === 'SEA' ? '' : String.fromCodePoint(...[.
 const EXTRA_NAMES = { ZW: 'Zimbabwe', BW: 'Botswana', SEA: 'At sea' };
 
 export async function loadAll() {
+  // data/site.json says which year this copy of the site is (2025.aeroverra.com, 2026.aeroverra.com, ...)
+  const S = await get('data/site.json');
   const [J, W, N, shapes] = await Promise.all([
-    get('data/journey.json'), get('data/wrapped2026.json'), get('data/next.json'), get('data/visited.geojson'),
+    get('data/journey.json'), get(`data/wrapped${S.year}.json`),
+    S.complete ? Promise.resolve(null) : get('data/next.json').catch(() => null),
+    get('data/visited.geojson'),
   ]);
-  return prepare(J, W, N, shapes);
+  const A = prepare(J, W, N, shapes);
+  A.site = S; A.year = S.year; A.complete = !!S.complete;
+  setPalette(A.countriesAll);
+  return A;
 }
 
 function prepare(J, W, N, shapes) {
@@ -82,6 +90,11 @@ function prepare(J, W, N, shapes) {
 
   const byId = {};
   shapes.features.forEach(f => { byId[f.properties.cc] = f.id; });
+  // a city belongs to the country whose outline it sits in (a travel day can credit the wrong one)
+  for (const pl of places) {
+    const hit = shapes.features.find(f => inShape(f.geometry, pl.p));
+    if (hit) pl.cc = hit.properties.cc;
+  }
 
   return {
     today: J.today, todayIdx, days, dayIdx, legs, names, first, places,
@@ -89,6 +102,19 @@ function prepare(J, W, N, shapes) {
     countries: J.countries.filter(c => c.cc !== 'SEA'),
     countriesAll: J.countries,
   };
+}
+
+function inRing(ring, x, y) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i], [xj, yj] = ring[j];
+    if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+function inShape(g, [lat, lon]) {
+  const polys = g.type === 'Polygon' ? [g.coordinates] : g.coordinates;
+  return polys.some(p => inRing(p[0], lon, lat));
 }
 
 export const fmt = n => Math.round(n).toLocaleString('en-US');

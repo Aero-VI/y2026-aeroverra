@@ -1,6 +1,6 @@
 // The player's heads-up display: departure-board date, where he is, running totals, the year ribbon.
-import { fmt, dateParts, flag, MODE } from './data.js?v=15';
-import { countryColor } from './palette.js?v=15';
+import { fmt, dateParts, flag, MODE } from './data.js?v=16';
+import { countryColor } from './palette.js?v=16';
 
 const $ = id => document.getElementById(id);
 
@@ -92,7 +92,13 @@ export class PlayerUI {
   }
   speed(s) { $('speeds').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(Number(b.dataset.s) === s))); }
   follow(on) { this.root.querySelector('.follow').hidden = on; }
-  end(on) { $('endcard').hidden = !on; }
+  end(on) {
+    $('endcard').hidden = !on;
+    if (on && this.A.complete) {
+      this.root.querySelector('.end-title').textContent = `That was ${this.A.year}.`;
+      this.root.querySelector('.end-sub').textContent = `${this.A.year + 1} picks up on the last page of the story.`;
+    }
+  }
 
   date(iso) {
     const p = dateParts(iso);
@@ -173,7 +179,7 @@ export class PlayerUI {
     if (!months.childElementCount) {
       const M = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
       months.innerHTML = M.map((m, k) => {
-        const i = this.A.dayIdx[`2026-${String(k + 1).padStart(2, '0')}-01`];
+        const i = this.A.dayIdx[`${this.A.year}-${String(k + 1).padStart(2, '0')}-01`];
         return `<span style="left:${(i / D.length) * 100}%">${m}</span>`;
       }).join('');
     }
