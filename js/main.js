@@ -1,29 +1,45 @@
-import { loadAll } from './data.js?v=14';
-import { createMap, addLayers } from './map.js?v=14';
-import { Overlay } from './overlay.js?v=14';
-import { Story } from './story.js?v=14';
-import { Player } from './player.js?v=14';
-import { PlayerUI } from './ui.js?v=14';
-import { Sound } from './audio.js?v=14';
+import { loadAll } from './data.js?v=15';
+import { createMap, addLayers, webglAvailable, nullMap } from './map.js?v=15';
+import { Overlay } from './overlay.js?v=15';
+import { Story } from './story.js?v=15';
+import { Player } from './player.js?v=15';
+import { PlayerUI } from './ui.js?v=15';
+import { Sound } from './audio.js?v=15';
 
 const body = document.body;
 const fail = msg => {
   const el = document.getElementById('bootError');
   el.textContent = msg;
+  el.title = 'Click to dismiss';
+  el.onclick = () => { el.hidden = true; };
   el.hidden = false;
 };
 
+const NO_GLOBE = 'The globe needs 3D graphics (WebGL), and this browser has them switched off right now. That usually happens after a graphics hiccup: restart the browser and it comes back. The story still works.';
+
 async function boot() {
   if (!window.maplibregl) return fail('The map library did not load. Check your connection and reload the page.');
-  let map;
-  try {
-    map = createMap('map');
-  } catch (e) {
-    return fail('This browser cannot draw the globe (WebGL is off or unsupported).');
+  let map = null;
+  if (webglAvailable()) {
+    try { map = createMap('map'); } catch (e) { console.error('globe failed to start', e); map = null; }
   }
-  const [A] = await Promise.all([loadAll(), new Promise(r => map.once('load', r))]);
-  addLayers(map, A);
-  const ov = new Overlay(map);
+  const globe = !!map;
+  let A;
+  if (globe) {
+    [A] = await Promise.all([loadAll(), new Promise(r => map.once('load', r))]);
+    addLayers(map, A);
+    // a GPU reset mid-visit: say what happened instead of freezing silently; MapLibre redraws on restore
+    const cv = map.getCanvas();
+    cv.addEventListener('webglcontextlost', () => fail('The graphics card reset. The globe should come back in a moment; if it does not, reload the page.'));
+    cv.addEventListener('webglcontextrestored', () => { document.getElementById('bootError').hidden = true; map.triggerRepaint(); });
+  } else {
+    // no globe: the whole story still works as pages of text, numbers and the calendar
+    A = await loadAll();
+    map = nullMap();
+    body.classList.add('no-globe');
+    fail(NO_GLOBE);
+  }
+  const ov = globe ? new Overlay(map) : { legs: [], pins: [], guides: [], vehicle: null, here: null, draw() {} };
   const sound = new Sound();
   const ui = new PlayerUI(A);
   ui.onFlip = () => sound.flap();
@@ -31,12 +47,13 @@ async function boot() {
   const player = new Player(map, ov, A, ui, sound);
   const story = new Story(map, ov, A, day => openPlayer(day), sound);
   body.classList.remove('is-loading');
-  map.getContainer().classList.add('is-ready');
+  if (globe) map.getContainer().classList.add('is-ready');
 
   // Play and Watch the story always bring the music in, even after an earlier mute
   const soundOn = () => { if (!sound.on) sound.toggle(); else sound.unlock(); paintSound(); };
 
   function openPlayer(day = 0) {
+    if (!globe) { fail(NO_GLOBE); return; }
     story.stopAuto();
     soundOn();
     story.suspended = true;

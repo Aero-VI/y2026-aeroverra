@@ -1,8 +1,8 @@
 // The story: one chapter per screen, each with its own camera move on the globe behind it.
-import { fmt, flag, longDate, dateParts } from './data.js?v=14';
-import { setHot, setVisited, setLit, styleLegsState } from './map.js?v=14';
-import { countryColor, TAIL } from './palette.js?v=14';
-import { slerp, clamp, smooth as smoothstep } from './geo.js?v=14';
+import { fmt, flag, longDate, dateParts } from './data.js?v=15';
+import { setHot, setVisited, setLit, styleLegsState } from './map.js?v=15';
+import { countryColor, TAIL } from './palette.js?v=15';
+import { slerp, clamp, smooth as smoothstep } from './geo.js?v=15';
 
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const phone = () => window.innerWidth <= 760;

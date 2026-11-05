@@ -123,6 +123,27 @@ function style() {
   };
 }
 
+/** Is WebGL available at all? (off in settings, or blocked by the browser after a graphics reset) */
+export function webglAvailable() {
+  try {
+    const c = document.createElement('canvas');
+    return !!(c.getContext('webgl2') || c.getContext('webgl'));
+  } catch (e) { return false; }
+}
+
+/** Stand-in when there is no globe, so the story (text, numbers, calendar) still works. */
+export function nullMap() {
+  const noop = () => nullMap.self;
+  const m = nullMap.self = {
+    jumpTo: noop, flyTo: noop, setFeatureState: noop, triggerRepaint: noop, setPadding: noop, stop: noop, redraw: noop,
+    on: noop, once: noop, isMoving: () => false, getCenter: () => ({ lng: 0, lat: 0 }),
+    getContainer: () => document.getElementById('map'), getCanvasContainer: () => document.createElement('div'),
+    scrollZoom: { enable() {}, disable() {} }, dragPan: { enable() {}, disable() {} },
+    touchZoomRotate: { enable() {}, disable() {} }, doubleClickZoom: { enable() {}, disable() {} },
+  };
+  return m;
+}
+
 export function createMap(el) {
   const map = new maplibregl.Map({
     container: el,
@@ -135,6 +156,9 @@ export function createMap(el) {
     renderWorldCopies: true,
     fadeDuration: 150,
     maxPitch: 60,
+    // a full-screen globe on a big high-DPI monitor is a lot of pixels; capping the ratio keeps the GPU
+    // well inside its budget (browsers block WebGL for a site after a GPU reset)
+    pixelRatio: Math.min(window.devicePixelRatio || 1, window.innerWidth > 1500 ? 1.5 : 2),
   });
   // keep the attribution to its (i) button; the full credits are in the last chapter
   const fold = () => map.getContainer().querySelectorAll('.maplibregl-compact-show').forEach(e => e.classList.remove('maplibregl-compact-show'));
