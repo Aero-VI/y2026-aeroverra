@@ -1,11 +1,10 @@
 {
   "note": "Hand-maintained. Where he is now and what is next, for the last chapter of 2026.aeroverra.com. Keep it to things that are booked or actually planned and mark which is which. Dates are local. p = [lat, lon] of the place.",
   "now": {
-    "city": "Barcelona", "cc": "ES", "country": "Spain", "since": "2026-11-01", "to": "2026-11-03", "p": [41.3874, 2.1686],
-    "line": "Landed 09:10 on AA 742 from Philadelphia. The rental car goes back at Terminal 2 at 05:00 on the 3rd."
+    "city": "Crawley", "cc": "GB", "country": "England", "since": "2026-11-06", "to": "2026-11-15", "p": [51.1092, -0.1872],
+    "line": "Landed at Gatwick 23:10 on easyJet EZY 8112 from Alicante, after missing the morning Jet2. Staying near Gatwick until Africa."
   },
   "next": [
-    { "city": "Alicante", "cc": "ES", "country": "Spain", "from": "2026-11-04", "to": "2026-11-15", "status": "planned", "p": [38.3452, -0.481], "line": "House hunting for the long-stay plan." },
     { "city": "Bulawayo and Victoria Falls", "cc": "ZW", "country": "Zimbabwe", "from": "2026-11-16", "to": "2026-11-24", "status": "booked", "p": [-17.9243, 25.8572], "line": "Horseback safari on a 50,000 acre ranch, then the falls. First time in Africa." },
     { "city": "Chobe National Park", "cc": "BW", "country": "Botswana", "from": "2026-11-21", "to": "2026-11-21", "status": "booked", "p": [-17.8, 25.15], "line": "A day in the park, out of Victoria Falls." }
   ]
