@@ -1,7 +1,7 @@
-import { makeArc, sampleArc, km } from './geo.js?v=16';
-import { setPalette } from './palette.js?v=16';
+import { makeArc, sampleArc, km } from './geo.js?v=17';
+import { setPalette } from './palette.js?v=17';
 
-const V = '16';
+const V = '17';
 const get = p => fetch(`${p}?v=${V}`).then(r => {
   if (!r.ok) throw new Error(`${p}: HTTP ${r.status}`);
   return r.json();
@@ -10,7 +10,7 @@ const get = p => fetch(`${p}?v=${V}`).then(r => {
 export const MODE = { f: 'flight', c: 'ship', r: 'train', b: 'bus', g: 'unrecorded' };
 export const flag = cc => (!cc || cc === 'SEA' ? '' : String.fromCodePoint(...[...cc].map(c => 0x1f1a5 + c.charCodeAt(0))));
 
-const EXTRA_NAMES = { ZW: 'Zimbabwe', BW: 'Botswana', SEA: 'At sea' };
+const EXTRA_NAMES = { ZA: 'South Africa', ZW: 'Zimbabwe', BW: 'Botswana', SEA: 'At sea' };
 
 export async function loadAll() {
   // data/site.json says which year this copy of the site is (2025.aeroverra.com, 2026.aeroverra.com, ...)

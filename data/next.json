@@ -1,11 +1,12 @@
 {
   "note": "Hand-maintained. Where he is now and what is next, for the last chapter of 2026.aeroverra.com. Keep it to things that are booked or actually planned and mark which is which. Dates are local. p = [lat, lon] of the place.",
   "now": {
-    "city": "Crawley", "cc": "GB", "country": "England", "since": "2026-11-06", "to": "2026-11-15", "p": [51.1092, -0.1872],
-    "line": "Landed at Gatwick 23:10 on easyJet EZY 8112 from Alicante, after missing the morning Jet2. Staying near Gatwick until Africa."
+    "city": "Crawley", "cc": "GB", "country": "England", "since": "2026-11-06", "to": "2026-11-14", "p": [51.1092, -0.1872],
+    "line": "Landed at Gatwick 23:10 on easyJet EZY 8112 from Alicante, after missing the morning Jet2. Staying near Gatwick until the Nov 14 night flight to Johannesburg."
   },
   "next": [
-    { "city": "Bulawayo and Victoria Falls", "cc": "ZW", "country": "Zimbabwe", "from": "2026-11-16", "to": "2026-11-24", "status": "booked", "p": [-17.9243, 25.8572], "line": "Horseback safari on a 50,000 acre ranch, then the falls. First time in Africa." },
+    { "city": "Johannesburg", "cc": "ZA", "country": "South Africa", "from": "2026-11-15", "to": "2026-11-15", "status": "booked", "p": [-26.1392, 28.246], "line": "Virgin VS 449 overnight from Heathrow, lands 08:40. One night by the airport before the Airlink hop to Bulawayo." },
+    { "city": "Bulawayo and Victoria Falls", "cc": "ZW", "country": "Zimbabwe", "from": "2026-11-16", "to": "2026-11-24", "status": "booked", "p": [-17.9243, 25.8572], "line": "Airlink 4Z 110 into Bulawayo Nov 16, then a horseback safari on a 50,000 acre ranch and the falls. First time in Africa." },
     { "city": "Chobe National Park", "cc": "BW", "country": "Botswana", "from": "2026-11-21", "to": "2026-11-21", "status": "booked", "p": [-17.8, 25.15], "line": "A day in the park, out of Victoria Falls." }
   ]
 }
