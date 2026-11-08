@@ -1,7 +1,7 @@
-import { makeArc, sampleArc, km } from './geo.js?v=18';
-import { setPalette } from './palette.js?v=18';
+import { makeArc, sampleArc, km } from './geo.js?v=19';
+import { setPalette } from './palette.js?v=19';
 
-const V = '18';
+const V = '19';
 const get = p => fetch(`${p}?v=${V}`).then(r => {
   if (!r.ok) throw new Error(`${p}: HTTP ${r.status}`);
   return r.json();
@@ -33,9 +33,11 @@ function prepare(J, W, N, shapes) {
   const days = J.days.map((d, i) => ({ ...d, i, cc: d.ccs ? (d.ccs.find(c => c !== 'SEA') || d.ccs[0] || null) : null }));
   const dayIdx = Object.fromEntries(days.map(d => [d.d, d.i]));
   const todayIdx = dayIdx[J.today];
+  // the player runs on through booked trips (legs flagged booked), the story stays on today
+  const playIdx = Math.max(todayIdx, ...J.legs.filter(L => L.booked).map(L => dayIdx[L.d1] ?? 0));
 
   // Fill the date-line hole (Jan 15) and any blank day with the day before, so the camera never loses him.
-  for (let i = 1; i <= todayIdx; i++) if (!days[i].p) days[i].p = days[i - 1].p;
+  for (let i = 1; i <= playIdx; i++) if (!days[i].p) days[i].p = days[i - 1].p;
 
   const perDir = {};
   const legs = J.legs.map(L => {
@@ -97,7 +99,7 @@ function prepare(J, W, N, shapes) {
   }
 
   return {
-    today: J.today, todayIdx, days, dayIdx, legs, names, first, places,
+    today: J.today, todayIdx, playIdx, days, dayIdx, legs, names, first, places,
     wrapped: W, next: N, shapes, shapeId: byId,
     countries: J.countries.filter(c => c.cc !== 'SEA'),
     countriesAll: J.countries,

@@ -1,6 +1,6 @@
 // The player's heads-up display: departure-board date, where he is, running totals, the year ribbon.
-import { fmt, dateParts, flag, MODE } from './data.js?v=18';
-import { countryColor } from './palette.js?v=18';
+import { fmt, dateParts, flag, MODE } from './data.js?v=19';
+import { countryColor } from './palette.js?v=19';
 
 const $ = id => document.getElementById(id);
 
@@ -94,6 +94,9 @@ export class PlayerUI {
   follow(on) { this.root.querySelector('.follow').hidden = on; }
   end(on) {
     $('endcard').hidden = !on;
+    if (on && !this.A.complete && this.A.playIdx > this.A.todayIdx) {
+      this.root.querySelector('.end-title').textContent = "That's everything booked so far.";
+    }
     if (on && this.A.complete) {
       this.root.querySelector('.end-title').textContent = `That was ${this.A.year}.`;
       this.root.querySelector('.end-sub').textContent = `${this.A.year + 1} picks up on the last page of the story.`;
@@ -125,7 +128,7 @@ export class PlayerUI {
       $('pLeg').textContent = 'At sea';
     } else if (cc) {
       const n = this.cum[cc]?.[day.i] || 0;
-      $('pLeg').innerHTML = n ? `${flag(cc)} ${esc(country)}, day ${n} there this year` : `${flag(cc)} ${esc(country)}`;
+      $('pLeg').innerHTML = (n && !day.booked ? `${flag(cc)} ${esc(country)}, day ${n} there this year` : `${flag(cc)} ${esc(country)}`);
     } else $('pLeg').textContent = '';
   }
 
@@ -134,7 +137,7 @@ export class PlayerUI {
     const what = L.t === 'g' ? 'Route not recorded' : `${L.t === 'f' ? 'Flight' : MODE[L.t][0].toUpperCase() + MODE[L.t].slice(1)} ${L.t === 'f' ? L.n : ''}`.trim();
     const ship = L.t === 'c' ? L.n : '';
     $('pPlace').innerHTML = `${esc(short(L.ac))}<span class="to">to</span>${esc(short(L.bc))}`;
-    $('pLeg').innerHTML = `<span class="mode">${esc(ship || what)}</span>&ensp;${fmt(L.mi)} mi`;
+    $('pLeg').innerHTML = `<span class="mode">${esc(ship || what)}</span>&ensp;${fmt(L.mi)} mi${L.booked ? '&ensp;<span class="booked">booked</span>' : ''}`;
   }
 
   tally(countries, miles, flights) {

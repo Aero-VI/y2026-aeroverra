@@ -284,6 +284,7 @@ a { color: inherit; }
 .place .to { color: var(--ink-3); font-weight: 700; padding: 0 0.2em; }
 .legcap { margin: 8px 0 0; min-height: 1.5em; font-size: 15px; color: var(--ink-2); text-shadow: 0 1px 10px rgba(7, 13, 34, 1); }
 .legcap .mode { font-weight: 600; }
+#pLeg .booked { display: inline-block; padding: 0 7px; border-radius: 999px; font: 600 11px/1.6 var(--text); background: rgba(85, 214, 194, 0.16); color: var(--sea); vertical-align: 1px; }
 
 .tally {
   position: absolute; top: max(20px, env(safe-area-inset-top)); right: calc(var(--gutter) + 176px);

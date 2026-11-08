@@ -2,8 +2,8 @@
 // along the sphere (pull back to see where he is going, push in on arrival), the vehicle rides the exact
 // centre of that path, and on the ground the camera settles and slowly closes in to the scale of the
 // next hop, so Japan's short train rides get room without any country-specific rules.
-import { flyCurve, slerp, arcRad, km, zoomToFit, clamp, ease, lonLat } from './geo.js?v=18';
-import { setHot, setVisited, styleLegsState } from './map.js?v=18';
+import { flyCurve, slerp, arcRad, km, zoomToFit, clamp, ease, lonLat } from './geo.js?v=19';
+import { setHot, setVisited, styleLegsState } from './map.js?v=19';
 
 const SPEEDS = [0.5, 1, 2, 4];
 const PITCH_MAX = 42;
@@ -16,7 +16,7 @@ function buildBeats(A) {
   const beats = [];
   const legs = A.legs;
   let li = 0, run = 0;
-  for (let di = 0; di <= A.todayIdx;) {
+  for (let di = 0; di <= A.playIdx;) {
     if (li < legs.length && legs[li].i0 <= di) {
       const L = legs[li++];
       beats.push({ kind: 'leg', L, day: di });
@@ -306,7 +306,7 @@ export class Player {
     if (cc && cc !== 'SEA') return cc;
     let a = i, b = i;
     while (a > 0 && (!D[a].cc || D[a].cc === 'SEA')) a--;
-    while (b < this.A.todayIdx && (!D[b].cc || D[b].cc === 'SEA')) b++;
+    while (b < this.A.playIdx && (!D[b].cc || D[b].cc === 'SEA')) b++;
     return D[a].cc && D[a].cc === D[b].cc ? D[a].cc : null;
   }
 
@@ -339,7 +339,7 @@ export class Player {
   // ---------------------------------------------------------------- scrubbing
   seek(dayIdx, hard = false) {
     const A = this.A;
-    dayIdx = clamp(Math.round(dayIdx), 0, A.todayIdx);
+    dayIdx = clamp(Math.round(dayIdx), 0, A.playIdx);
     this.reset();
     this.beats.forEach(b => { b.ready = false; });
     let bi = this.beats.findIndex(b => b.day >= dayIdx && b.kind !== 'pause');
