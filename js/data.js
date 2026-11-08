@@ -1,7 +1,7 @@
-import { makeArc, sampleArc, km } from './geo.js?v=17';
-import { setPalette } from './palette.js?v=17';
+import { makeArc, sampleArc, km } from './geo.js?v=18';
+import { setPalette } from './palette.js?v=18';
 
-const V = '17';
+const V = '18';
 const get = p => fetch(`${p}?v=${V}`).then(r => {
   if (!r.ok) throw new Error(`${p}: HTTP ${r.status}`);
   return r.json();

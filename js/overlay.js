@@ -1,7 +1,7 @@
 // A 2D canvas over the map for everything that moves: the leg being drawn, the vehicle on it, and the
 // "here" marker. It repaints inside MapLibre's own render event, so the line tip, the vehicle and the
 // globe are always from the same frame (no worker round trip, no tip trailing behind the plane).
-import { COLORS as C } from './map.js?v=17';
+import { COLORS as C } from './map.js?v=18';
 
 const GLYPH = {
   f: new Path2D('M0,-11.5c1.3,0,1.8,1.4,1.8,3.2v5l9.2,5.3v2.3l-9.2-2.6v6.2l3.1,2.3v1.8l-4.9-1.3l-4.9,1.3v-1.8l3.1-2.3v-6.2l-9.2,2.6v-2.3l9.2-5.3v-5c0-1.8,0.5-3.2,1.8-3.2z'),
@@ -66,7 +66,8 @@ export class Overlay {
     for (const gd of this.guides) this.drawGuide(gd);
     for (const a of this.legs) this.drawLeg(a);
     if (this.here) this.drawHere(this.here);
-    this.taken = [];
+    // every pin dot is reserved first, so no label is written over another pin
+    this.taken = this.pins.map(({ p }) => this.pt(p)).filter(Boolean).map(q => [q[0] - 8, q[1] - 8, 16, 16]);
     for (const p of this.pins) this.drawPin(p);
     if (this.vehicle) this.drawVehicle(this.vehicle);
   }
@@ -188,8 +189,8 @@ export class Overlay {
     if (label) {
       g.font = '600 13px "Hanken Grotesk", sans-serif';
       const w = g.measureText(label).width, h = 16;
-      // first free spot among above, below, right, left of the pin
-      const spots = [[-w / 2, -24], [-w / 2, 10], [10, -8], [-w - 10, -8]];
+      // first free spot around the pin (above, below, right, left, then the corners and further out)
+      const spots = [[-w / 2, -24], [-w / 2, 10], [10, -8], [-w - 10, -8], [10, 10], [-w - 10, 10], [10, -26], [-w - 10, -26], [-w / 2, -42], [-w / 2, 28]];
       let at = spots[0];
       for (const s of spots) {
         const r = [q[0] + s[0] - 3, q[1] + s[1] - 2, w + 6, h + 4];

@@ -6,7 +6,8 @@
   },
   "next": [
     { "city": "Johannesburg", "cc": "ZA", "country": "South Africa", "from": "2026-11-15", "to": "2026-11-15", "status": "booked", "p": [-26.1392, 28.246], "line": "Virgin VS 449 overnight from Heathrow, lands 08:40. One night by the airport before the Airlink hop to Bulawayo." },
-    { "city": "Bulawayo and Victoria Falls", "cc": "ZW", "country": "Zimbabwe", "from": "2026-11-16", "to": "2026-11-24", "status": "booked", "p": [-17.9243, 25.8572], "line": "Airlink 4Z 110 into Bulawayo Nov 16, then a horseback safari on a 50,000 acre ranch and the falls. First time in Africa." },
+    { "city": "Rocky Glen Ranch", "cc": "ZW", "country": "Zimbabwe", "from": "2026-11-16", "to": "2026-11-20", "status": "booked", "p": [-21.06, 29.36], "line": "Airlink 4Z 110 into Bulawayo Nov 16, then a horseback safari on a 50,000 acre ranch near West Nicholson. First time in Africa." },
+    { "city": "Victoria Falls", "cc": "ZW", "country": "Zimbabwe", "from": "2026-11-20", "to": "2026-11-24", "status": "booked", "p": [-17.9243, 25.8572], "line": "Group flight up from Bulawayo for four nights at the falls." },
     { "city": "Chobe National Park", "cc": "BW", "country": "Botswana", "from": "2026-11-21", "to": "2026-11-21", "status": "booked", "p": [-17.8, 25.15], "line": "A day in the park, out of Victoria Falls." }
   ]
 }
