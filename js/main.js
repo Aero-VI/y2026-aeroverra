@@ -1,10 +1,10 @@
-import { loadAll } from './data.js?v=19';
-import { createMap, addLayers, webglAvailable, nullMap } from './map.js?v=19';
-import { Overlay } from './overlay.js?v=19';
-import { Story } from './story.js?v=19';
-import { Player } from './player.js?v=19';
-import { PlayerUI } from './ui.js?v=19';
-import { Sound } from './audio.js?v=19';
+import { loadAll } from './data.js?v=20';
+import { createMap, addLayers, webglAvailable, nullMap } from './map.js?v=20';
+import { Overlay } from './overlay.js?v=20';
+import { Story } from './story.js?v=20';
+import { Player } from './player.js?v=20';
+import { PlayerUI } from './ui.js?v=20';
+import { Sound } from './audio.js?v=20';
 
 const body = document.body;
 const fail = msg => {

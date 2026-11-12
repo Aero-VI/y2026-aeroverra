@@ -1,8 +1,8 @@
 // The story: one chapter per screen, each with its own camera move on the globe behind it.
-import { fmt, flag, longDate, dateParts } from './data.js?v=19';
-import { setHot, setVisited, setLit, styleLegsState } from './map.js?v=19';
-import { countryColor, TAIL } from './palette.js?v=19';
-import { slerp, clamp, smooth as smoothstep } from './geo.js?v=19';
+import { fmt, flag, longDate, dateParts } from './data.js?v=20';
+import { setHot, setVisited, setLit, styleLegsState } from './map.js?v=20';
+import { countryColor, TAIL } from './palette.js?v=20';
+import { slerp, clamp, smooth as smoothstep } from './geo.js?v=20';
 
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const phone = () => window.innerWidth <= 760;
@@ -61,12 +61,12 @@ export function chapters(A) {
       html: `
         <p class="hero-name">Nicholas Halka</p>
         <h1 class="hero-title">Where <span class="yr">${Y}</span> went</h1>
-        <p class="lede">Every flight, ship and train of his year, drawn on the globe in the order it happened: <strong>${W.countries} countries</strong> and <strong>${fmt(W.total_miles)} miles</strong>${A.complete ? '' : ' so far'}.</p>
+        <p class="lede">Every flight, ship and train of his year, drawn on the globe in the order it happened: <strong>${W.countries} countries</strong> and <strong>${fmt(W.total_miles)} miles</strong>${A.complete ? '' : (A.through > A.today ? ', counting the trips already booked' : ' so far')}.</p>
         <div class="hero-acts">
           <button class="btn btn-solid" type="button" data-act="play">Play the year</button>
           <button class="btn btn-ghost" type="button" data-act="auto">Watch the story</button>
         </div>
-        <p class="asof">${A.complete ? `January 1 to December 31, ${Y}.` : `Through ${longDate(A.today)}, day ${W.day_of_year} of ${A.days.length}.`}${(S.siblings || []).map(s => ` <a href="${s.url}">${s.year}</a>`).join('')}</p>`,
+        <p class="asof">${A.complete ? `January 1 to December 31, ${Y}.` : (A.through > A.today ? `Counts everything booked through ${longDate(A.through)}. Today is ${longDate(A.today)}, day ${W.day_of_year} of ${A.days.length}.` : `Through ${longDate(A.today)}, day ${W.day_of_year} of ${A.days.length}.`)}${(S.siblings || []).map(s => ` <a href="${s.url}">${s.year}</a>`).join('')}</p>`,
     },
     {
       id: 'countries',
@@ -197,7 +197,7 @@ export function chapters(A) {
       pins: [{ p: [33.6891, -78.8867] }],
       html: `
         ${stat(W.home_days, 'nights in his own bed')}
-        <p class="lede">Home is Myrtle Beach. Of the ${W.day_of_year} days${A.complete ? ' of the year' : ' so far'}, he spent ${W.days_us} in the US, ${W.days_abroad} abroad and ${W.days_sea} at sea.</p>
+        <p class="lede">Home is Myrtle Beach. Of the ${W.through_doy || W.day_of_year} days${A.complete ? ' of the year' : (A.through > A.today ? ` through ${longDate(A.through)}, booked trips included` : ' so far')}, he spent ${W.days_us} in the US, ${W.days_abroad} abroad and ${W.days_sea} at sea${(() => { const gap = (W.through_doy || W.day_of_year) - W.days_us - W.days_abroad - W.days_sea; return gap > 0 ? `, with ${gap} still to plan` : ''; })()}.</p>
         <div class="split" aria-hidden="true">
           <span style="flex:${W.days_us};background:${countryColor('US')}"></span>
           <span style="flex:${W.days_abroad};background:var(--amber)"></span>
@@ -240,7 +240,7 @@ export function chapters(A) {
           <li><span class="nm">${c.cc === 'SEA' ? 'At sea' : `${flag(c.cc)} ${esc(c.name)}`}</span><span class="bar" style="width:${(c.days / ranked[0].days) * 100}%;--c:${countryColor(c.cc)}"></span><span class="v">${c.days}</span></li>`).join('')}
           ${tail.length ? `<li><span class="nm">${tail.length} more</span><span class="bar" style="width:${(tail.reduce((s, c) => s + c.days, 0) / ranked[0].days) * 100}%;--c:${TAIL}"></span><span class="v">${tail.reduce((s, c) => s + c.days, 0)}</span></li>` : ''}
         </ul>
-        <p class="key">Days per country. A travel day counts for both ends, so the total runs past ${W.day_of_year}.</p>`,
+        <p class="key">Days per country. A travel day counts for both ends, so the total runs past ${W.through_doy || W.day_of_year}.</p>`,
     },
     {
       id: 'calendar',
@@ -290,7 +290,7 @@ export function chapters(A) {
         <h2 class="hero-title">Watch it happen</h2>
         <p class="lede">All ${legs.length} legs in order, with the camera riding along. About ${minutes} minutes at normal speed, and you can scrub to any day.</p>
         <div class="hero-acts"><button class="btn btn-solid" type="button" data-act="play">Play the year</button></div>
-        <p class="method">Built from his booking confirmations: every flight, train, bus, cruise and hotel. A day counts for each country he set foot in. Dotted lines are hops with no ticket on file, like a drive or a local train. Distances are great circles. ${A.complete ? `Covers all of ${Y}.` : `Updated ${longDate(A.today)}, ${Y}.`}${(S.siblings || []).length ? ` Other years: ${S.siblings.map(s => `<a href="${s.url}">${s.year}</a>`).join(', ')}.` : ''}<br><br>Map © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, <a href="https://openmaptiles.org">OpenMapTiles</a>, served by <a href="https://openfreemap.org">OpenFreeMap</a>. Terrain from Mapzen on AWS Open Data. Borders from Natural Earth.</p>`,
+        <p class="method">Built from his booking confirmations: every flight, train, bus, cruise and hotel. A day counts for each country he set foot in. Dotted lines are hops with no ticket on file, like a drive or a local train. Distances are great circles. ${A.complete ? `Covers all of ${Y}.` : `Updated ${longDate(A.today)}, ${Y}${A.through > A.today ? `; totals include trips booked through ${longDate(A.through)}` : ''}.`}${(S.siblings || []).length ? ` Other years: ${S.siblings.map(s => `<a href="${s.url}">${s.year}</a>`).join(', ')}.` : ''}<br><br>Map © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, <a href="https://openmaptiles.org">OpenMapTiles</a>, served by <a href="https://openfreemap.org">OpenFreeMap</a>. Terrain from Mapzen on AWS Open Data. Borders from Natural Earth.</p>`,
     },
   ].filter(Boolean);
 
