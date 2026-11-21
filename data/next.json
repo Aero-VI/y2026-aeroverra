@@ -7,6 +7,7 @@
   "next": [
     { "city": "Livingstone", "cc": "ZM", "country": "Zambia", "from": "2026-11-22", "to": "2026-11-22", "status": "planned", "p": [-17.8419, 25.8543], "line": "Free day: across the bridge to the Zambian side of the falls." },
     { "city": "Chobe National Park", "cc": "BW", "country": "Botswana", "from": "2026-11-23", "to": "2026-11-23", "status": "booked", "p": [-17.8, 25.15], "line": "A day in the park, out of Victoria Falls." },
+    { "city": "Myrtle Beach", "cc": "US", "country": "United States", "from": "2026-11-25", "to": "2026-12-02", "status": "booked", "p": [33.6891, -78.8867], "line": "Home for Thanksgiving: South African Airways SA 41 Victoria Falls to Johannesburg Nov 24, then Delta DL 201 overnight to Atlanta and DL 3047 into Myrtle Beach the morning of Nov 25." },
     { "city": "Wildwood", "cc": "US", "country": "United States", "from": "2026-12-02", "to": "2026-12-04", "status": "booked", "p": [28.8653, -82.0401], "line": "Breeze MX 1566 Myrtle Beach to Orlando Dec 2, Hertz up to the Comfort Inn at The Villages for two nights, car back to MCO Dec 4." },
     { "city": "Austin", "cc": "US", "country": "United States", "from": "2026-12-04", "to": "2026-12-06", "status": "booked", "p": [30.2672, -97.7431], "line": "Delta DL 2259 Orlando to Austin Dec 4, two nights with a rental car, then home to Myrtle Beach through Atlanta on Dec 6." }
   ]
