@@ -1,6 +1,6 @@
 // The player's heads-up display: departure-board date, where he is, running totals, the year ribbon.
-import { fmt, dateParts, flag, MODE } from './data.js?v=20';
-import { countryColor } from './palette.js?v=20';
+import { fmt, dateParts, flag, MODE } from './data.js?v=21';
+import { countryColor } from './palette.js?v=21';
 
 const $ = id => document.getElementById(id);
 
